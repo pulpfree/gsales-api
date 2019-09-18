@@ -1,0 +1,32 @@
+const payload = [ { id: '5810b7bc4da2d436310fb074',
+    recordNum: '2016-10-10-1',
+    stationID: '56cf1815982d82b0f3000001',
+    litres: { open: 729158.884, close: 729186.884, net: 28 },
+    dollars:
+     { open: 776248.78,
+       close: 776278.78,
+       net: 30,
+       theoretical: 30.492000000000004,
+       diff: 0.49200000000000443 } },
+  { id: '5810b7bc4da2d436310fb075',
+    litres: { open: 1080785.216, close: 1080888.216, net: 103 },
+    dollars:
+     { open: 11260543.6,
+       close: 11260643.6,
+       net: 100,
+       theoretical: 98.777,
+       diff: -1.222999999999999 } },
+  { id: '5810b7bc4da2d436310fb076',
+    litres: { open: 1611001.988, close: 0 },
+    dollars: { open: 1859918.29, close: 0 } },
+  { id: '5810b7bc4da2d436310fb077',
+    litres: { open: 3206074.56, close: 0 },
+    dollars: { open: 3486327.7, close: 0 } },
+  { id: '5810b7bc4da2d436310fb078',
+    litres: { open: 6635140.352, close: 0 },
+    dollars: { open: 6675854.49, close: 0 } },
+  { id: '5810b7bc4da2d436310fb079',
+    litres: { open: 591776.628, close: 0 },
+    dollars: { open: 657513.66, close: 0 } } ]
+
+module.exports = payload

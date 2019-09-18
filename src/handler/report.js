@@ -1,0 +1,974 @@
+/* eslint-disable no-underscore-dangle, no-case-declarations */
+import ramda from 'ramda'
+
+const Boom = require('boom')
+const sanz = require('mongo-sanitize')
+const mongoose = require('mongoose')
+const moment = require('moment')
+
+const FuelDefinition = require('../model/fuel-definition')
+const FuelSales = require('../model/fuel-sales')
+const Journal = require('../model/journal')
+const NonFuelSales = require('../model/non-fuel-sales')
+const Product = require('../model/product')
+const Sales = require('../model/sales')
+const Station = require('../model/station')
+
+// TODO: these belong in config
+const recordLimit = 200
+const HSTDivisor = 1.13
+const propaneDispenserID = mongoose.Types.ObjectId('56e7593f982d82eeff262cd6')
+
+// const util = require('util')
+
+function ReportHandler() {}
+
+ReportHandler.prototype.monthlySales = async (request, h) => {
+  if (!request.query.date) {
+    return Boom.badRequest('Missing date')
+  }
+
+  const sDte = moment.utc(request.query.date)
+  const eDte = sDte.clone().endOf('month')
+
+  let salesData
+  let stations
+  const stationData = []
+
+  try {
+    stations = await Station.find({}, { name: 1 }).sort({ name: 1 })
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+
+  try {
+    salesData = await Sales.aggregate([
+      { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+      {
+        $group: {
+          _id: '$stationID',
+          'sales-fuelDollar': { $sum: '$salesSummary.fuelDollar' },
+          'sales-nonFuel': { $sum: '$salesSummary.totalNonFuel' },
+          'sales-cash': { $sum: '$salesSummary.cashTotal' },
+          'sales-creditCard': { $sum: '$salesSummary.creditCardTotal' },
+          'sales-cashAndCards': { $sum: '$salesSummary.cashCCTotal' },
+          'sales-totalSales': { $sum: '$salesSummary.totalSales' },
+          overshort: { $sum: '$overshort.amount' },
+          fuel1Avg: { $avg: '$fuelCosts.fuel_1' },
+        },
+      },
+    ])
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+
+  // Need to find the station name, we could create a more complex aggregate but we still need
+  // to modify data
+  //
+  // Because there are stations that may not have data for the specified date range
+  // we eliminate any stations without sales data
+  stations.forEach((station) => {
+    const sData = salesData.find(sd => sd._id.toString() === station._id.toString())
+    if (sData) {
+      sData.stationName = station.name
+      sData['sales-fuelDollar-NoHST'] = sData['sales-fuelDollar'] / HSTDivisor
+      sData['sales-fuelDollar-HST'] = sData['sales-fuelDollar'] - sData['sales-fuelDollar-NoHST']
+      stationData.push(sData)
+    }
+  })
+
+  return h.response(stationData)
+}
+
+ReportHandler.prototype.monthlySalesDetail = async (request, h) => {
+  if (!request.query.date) {
+    return Boom.badRequest('Missing date')
+  }
+  if (!request.query.type) {
+    return Boom.badRequest('Missing type')
+  }
+  const detailType = sanz(request.query.type)
+
+  const sDte = moment.utc(request.query.date)
+  const eDte = sDte.clone().endOf('month')
+
+  let data
+  let dataRet
+
+  switch (detailType) {
+    case 'nonFuel':
+      try {
+        data = await NonFuelSales.aggregate([
+          { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+          {
+            $lookup: {
+              from: 'products', localField: 'productID', foreignField: '_id', as: 'product',
+            },
+          },
+          { $unwind: '$product' },
+          {
+            $group: {
+              _id: '$product.category',
+              qty: { $sum: '$qty.sold' },
+              sales: { $sum: '$sales' },
+            },
+          },
+          { $sort: { 'product.category': 1 } },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      // Now fetch 'other' nonFuel
+      let otherNonFuel
+      try {
+        otherNonFuel = await Sales.aggregate([
+          { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+          {
+            $group: {
+              _id: 'otherNonFuel',
+              giftCerts: { $sum: '$otherNonFuel.giftCerts' },
+              bobs: { $sum: '$otherNonFuel.bobs' },
+              payout: { $sum: '$cash.payout' },
+              lotteryPayout: { $sum: '$cash.lotteryPayout' },
+            },
+          },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      const other = {}
+      otherNonFuel.forEach((o) => {
+        other._id = 'otherNonFuel'
+        other.giftCerts = o.giftCerts
+        other.bobs = o.bobs
+        other.payout = o.payout
+        other.lotteryPayout = o.lotteryPayout
+      })
+      const ret = {
+        nonFuel: data,
+        otherNonFuel: other,
+      }
+
+      dataRet = {
+        id: 'nonFuel',
+        result: ret,
+      }
+      return h.response(dataRet)
+
+    case 'cash':
+      try {
+        data = await Sales.aggregate([
+          { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+          {
+            $group: {
+              _id: 'cash',
+              'cash-bills': { $sum: '$cash.bills' },
+              'cash-debit': { $sum: '$cash.debit' },
+              'cash-dieselDiscount': { $sum: '$cash.dieselDiscount' },
+              'cash-giftCertRedeem': { $sum: '$cash.giftCertRedeem' },
+              'cash-driveOffNSF': { $sum: '$cash.driveOffNSF' },
+              'cash-other': { $sum: '$cash.other' },
+              'cash-lotteryPayout': { $sum: '$cash.lotteryPayout' },
+              'cash-payout': { $sum: '$cash.payout' },
+              'cash-osAdjusted': { $sum: '$cash.osAdjusted' },
+              'cash-writeOff': { $sum: '$cash.writeOff' },
+              'creditCard-amex': { $sum: '$creditCard.amex' },
+              'creditCard-discover': { $sum: '$creditCard.discover' },
+              'creditCard-gales': { $sum: '$creditCard.gales' },
+              'creditCard-mc': { $sum: '$creditCard.mc' },
+              'creditCard-visa': { $sum: '$creditCard.visa' },
+              'sales-cash': { $sum: '$salesSummary.cashTotal' },
+              'sales-creditCard': { $sum: '$salesSummary.creditCardTotal' },
+              'sales-cashAndCards': { $sum: '$salesSummary.cashCCTotal' },
+            },
+          },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      dataRet = {
+        id: 'cash',
+        result: data[0],
+      }
+      return h.response(dataRet)
+
+
+    case 'fuel':
+      let grades
+
+      try {
+        grades = await FuelDefinition.find()
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      try {
+        data = await FuelSales.aggregate([
+          { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+          {
+            $group: {
+              _id: '$gradeID',
+              'dollars-diff': { $sum: '$dollars.diff' },
+              'dollars-theoretical': { $sum: '$dollars.theoretical' },
+              'dollars-net': { $sum: '$dollars.net' },
+              'litres-net': { $sum: '$litres.net' },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      const gs = {}
+      grades.forEach((g) => { gs[g._id] = g.label })
+
+      // Calculate HST
+      data = data.map((d) => {
+        const dup = ramda.clone(d)
+        dup['dollars-net-NoHST'] = dup['dollars-net'] / HSTDivisor
+        dup['dollars-net-HST'] = dup['dollars-net'] - dup['dollars-net-NoHST']
+        return dup
+      })
+
+      dataRet = {
+        id: 'fuel',
+        meta: {
+          grades: gs,
+        },
+        result: data,
+      }
+      return h.response(dataRet)
+
+    case 'station':
+      if (!request.query.stationID) {
+        return Boom.badRequest('Missing station id')
+      }
+
+      const stationID = mongoose.Types.ObjectId(request.query.stationID)
+      let stationName
+      try {
+        const st = await Station.findById(stationID, { name: 1 }).exec()
+        stationName = st.name
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      try {
+        data = await Sales.aggregate([
+          { $match: { stationID, recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+          {
+            $group: {
+              _id: null,
+              'cash-bills': { $sum: '$cash.bills' },
+              'cash-debit': { $sum: '$cash.debit' },
+              'cash-dieselDiscount': { $sum: '$cash.dieselDiscount' },
+              'cash-giftCertRedeem': { $sum: '$cash.giftCertRedeem' },
+              'cash-driveOffNSF': { $sum: '$cash.driveOffNSF' },
+              'cash-other': { $sum: '$cash.other' },
+              'cash-payout': { $sum: '$cash.payout' },
+              'cash-lotteryPayout': { $sum: '$cash.lotteryPayout' },
+              'creditCard-amex': { $sum: '$creditCard.amex' },
+              'creditCard-discover': { $sum: '$creditCard.discover' },
+              'creditCard-gales': { $sum: '$creditCard.gales' },
+              'creditCard-mc': { $sum: '$creditCard.mc' },
+              'creditCard-visa': { $sum: '$creditCard.visa' },
+              'sales-fuelDollar': { $sum: '$salesSummary.fuelDollar' },
+              'sales-nonFuel': { $sum: '$salesSummary.totalNonFuel' },
+              'sales-cash': { $sum: '$salesSummary.cashTotal' },
+              'sales-creditCard': { $sum: '$salesSummary.creditCardTotal' },
+              'sales-cashAndCards': { $sum: '$salesSummary.cashCCTotal' },
+              'sales-product': { $sum: '$salesSummary.product' },
+              'sales-totalSales': { $sum: '$salesSummary.totalSales' },
+              osAdjust: { $sum: '$cash.osAdjust' },
+              overshort: { $sum: '$overshort.amount' },
+              'otherNonFuel-giftCerts': { $sum: '$otherNonFuel.giftCerts' },
+              'otherNonFuelBobs-giftCerts': { $sum: '$otherNonFuelBobs.bobsGiftCerts' },
+              'otherNonFuel-bobs': { $sum: '$otherNonFuel.bobs' },
+              otherFuelPropaneDollar: { $sum: '$otherFuel.propane.dollar' },
+              otherFuelPropaneLitre: { $sum: '$otherFuel.propane.litre' },
+              fuel1Avg: { $avg: '$fuelCosts.fuel_1' },
+            },
+          },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      // Now product categories
+      let prodCat
+      try {
+        prodCat = await NonFuelSales.aggregate([
+          { $match: { stationID, recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+          {
+            $lookup: {
+              from: 'products', localField: 'productID', foreignField: '_id', as: 'product',
+            },
+          },
+          { $unwind: '$product' },
+          {
+            $group: {
+              _id: '$product.category',
+              qty: { $sum: '$qty.sold' },
+              sales: { $sum: '$sales' },
+            },
+          },
+          { $sort: { 'product.category': 1 } },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      const dRet = data[0]
+      const productCats = prodCat.map(p => ({ category: p._id, qty: p.qty, sales: p.sales }))
+      dRet.productCats = productCats
+
+      // report1 products
+      let nf
+      try {
+        nf = await NonFuelSales.aggregate([
+          { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() }, stationID } },
+          {
+            $lookup: {
+              from: 'products', localField: 'productID', foreignField: '_id', as: 'product',
+            },
+          },
+          { $unwind: '$product' },
+          { $match: { 'product.type': 'report1' } },
+          {
+            $group: {
+              _id: { id: '$product._id', name: '$product.name' },
+              qty: { $sum: '$qty.sold' },
+            },
+          },
+        ])
+        if (nf.length > 0) {
+          const report1 = nf.map(n => ({ id: n._id.id, name: n._id.name, qty: n.qty }))
+          report1.sort((a, b) => {
+            if (a.name > b.name) { return 1 }
+            if (a.name < b.name) { return -1 }
+            return 0
+          })
+          dRet.report1 = report1
+        }
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      dataRet = {
+        id: 'station',
+        meta: {
+          stationName,
+        },
+        result: dRet,
+      }
+      return h.response(dataRet)
+
+    case 'stationSum':
+      const salesRes = []
+      let fuelData
+      let oilData
+      let salesData
+      let stations
+
+      try {
+        stations = await Station.find({}, { name: 1 }).sort({ name: 1 })
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      try {
+        salesData = await Sales.aggregate([
+          { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+          {
+            $group: {
+              _id: '$stationID',
+              'cash-payout': { $sum: '$cash.payout' },
+              'otherNonFuel-bobs': { $sum: '$otherNonFuel.bobs' },
+            },
+          },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      try {
+        oilData = await NonFuelSales.aggregate([
+          { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() } } },
+          {
+            $lookup: {
+              from: 'products', localField: 'productID', foreignField: '_id', as: 'product',
+            },
+          },
+          { $unwind: '$product' },
+          { $match: { 'product.category': 'oil' } },
+          {
+            $group: {
+              _id: '$stationID',
+              sold: { $sum: '$qty.sold' },
+            },
+          },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      try {
+        fuelData = await FuelSales.aggregate([
+          {
+            $match: {
+              recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() },
+              dispenserID: propaneDispenserID,
+            },
+          },
+          {
+            $group: {
+              _id: '$stationID',
+              litres: { $sum: '$litres.net' },
+              dollars: { $sum: '$dollars.net' },
+            },
+          },
+        ])
+      } catch (err) {
+        return Boom.badRequest(err)
+      }
+
+      salesData.forEach((sd) => {
+        const saleData = ramda.clone(sd)
+        const station = stations.find(s => saleData._id.toString() === s._id.toString())
+        saleData.stationName = station.name
+        saleData.oil = null
+        saleData.propane = null
+
+        const oilD = oilData.find(o => o._id.toString() === saleData._id.toString())
+        if (oilD !== undefined) {
+          saleData.oil = oilD.sold
+        }
+        // Set propane on Thorold Stone Back
+        if (saleData._id.toString() === fuelData[0]._id.toString()) {
+          [saleData.propane] = fuelData
+        }
+        salesRes.push(saleData)
+      })
+
+      salesRes.sort((a, b) => {
+        if (a.stationName > b.stationName) {
+          return 1
+        }
+        if (a.stationName < b.stationName) {
+          return -1
+        }
+        return 0
+      })
+
+      dataRet = {
+        id: 'stationSum',
+        meta: {},
+        result: salesRes,
+      }
+      return h.response(dataRet)
+
+    default:
+      return Boom.badRequest('Invalid report type')
+  }
+}
+
+ReportHandler.prototype.shifts = async (request, h) => {
+  if (!request.query.startDate) {
+    return Boom.badRequest('Missing start date')
+  }
+
+  let eDte
+  const q = {}
+  if (request.query.endDate) {
+    eDte = moment.utc(request.query.endDate)
+  }
+  const sDte = moment.utc(request.query.startDate)
+
+  if (sDte && eDte) {
+    q.recordDate = { $gte: sDte.format(), $lte: eDte.format() }
+  } else {
+    q.recordDate = { $gte: sDte.format() }
+  }
+  if (request.query.stationID) {
+    q.stationID = mongoose.Types.ObjectId(request.query.stationID)
+  }
+
+  const fields = {
+    attendant: 1,
+    recordDate: 1,
+    recordNum: 1,
+    'shift.number': 1,
+    salesSummary: 1,
+    stationID: 1,
+    overshort: 1,
+    'otherNonFuel.giftCerts': 1,
+  }
+
+  const dataRet = {
+    id: 'shifts',
+    meta: {
+      dates: {
+        startDate: sDte,
+        endDate: eDte,
+        stationID: sanz(request.query.stationID),
+      },
+    },
+    keys: null,
+  }
+
+  let items
+  try {
+    items = await Sales.find(q, fields)
+      .populate(['attendant.ID', 'stationID'])
+      .sort({ stationID: 1, recordNum: 1 })
+      .limit(recordLimit)
+    dataRet.keys = items
+    return h.response(dataRet)
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+}
+
+// Not sure if this report is actually in use
+ReportHandler.prototype.shiftHistory = async (request, h) => {
+  if (!request.query.startDate) {
+    return Boom.badRequest('Missing start date')
+  }
+  if (!request.query.stationID) {
+    return Boom.badRequest('Missing station id')
+  }
+
+  let eDte
+  const q = {}
+  const sDte = moment.utc(sanz(request.query.startDate))
+  if (request.query.endDate) {
+    eDte = moment.utc(sanz(request.query.endDate))
+  }
+
+  if (sDte && eDte) {
+    q.recordDate = { $gte: sDte.format(), $lte: eDte.format() }
+  } else {
+    q.recordDate = { $gte: sDte.format() }
+  }
+  const stationID = sanz(request.query.stationID)
+  q.stationID = mongoose.Types.ObjectId(stationID)
+
+  const fields = {
+    otherNonFuel: 1,
+    overshort: 1,
+    salesSummary: 1,
+    'shift.number': 1,
+    stationID: 1,
+    attendant: 1,
+    cash: 1,
+    creditCard: 1,
+    recordDate: 1,
+    recordNum: 1,
+  }
+
+  const dataRet = {
+    id: 'shift-history',
+    meta: {
+      dates: {
+        startDate: sDte,
+        endDate: eDte,
+        stationID,
+      },
+    },
+    keys: null,
+  }
+
+  try {
+    const sales = await Sales.find(q, fields)
+      .populate('attendant.ID')
+      .sort({ recordNum: -1 })
+      .limit(recordLimit)
+
+    dataRet.keys = sales
+    return h.response(dataRet)
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+}
+
+ReportHandler.prototype.shift = async (request, h) => {
+  if (!request.params.id) {
+    return Boom.badRequest('Missing shift id')
+  }
+  const shiftID = sanz(request.params.id)
+
+  try {
+    const saleItems = await Sales.findById(shiftID)
+      .populate(['attendant.ID', 'stationID'])
+
+    const dataRet = {
+      id: 'shift-detail',
+      meta: {
+        shiftID,
+      },
+      result: saleItems,
+    }
+    return h.response(dataRet)
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+}
+
+ReportHandler.prototype.attendant = async (request, h) => {
+  if (!request.query.startYear) {
+    return Boom.badRequest('Missing startYear')
+  }
+  if (!request.query.employeeID) {
+    return Boom.badRequest('Missing employee id')
+  }
+
+  const dateKeys = ['startYear', 'startMonth', 'endYear', 'endMonth']
+  const qDates = {}
+
+  dateKeys.forEach((k) => {
+    if (request.query[k]) {
+      if (k.indexOf('Month') > 0) {
+        qDates[k] = String(`00${Number(request.query[k]) + 1}`).slice(-2)
+      } else {
+        qDates[k] = sanz(request.query[k])
+      }
+    }
+  })
+
+  const q = {
+    'attendant.ID': mongoose.Types.ObjectId(sanz(request.query.employeeID)),
+  }
+  let sDte; let
+    eDte
+
+  if (qDates.startYear && qDates.startMonth && qDates.endYear && qDates.endMonth) {
+    sDte = moment.utc(`${qDates.startYear}-${qDates.startMonth}`)
+    eDte = moment.utc(`${qDates.endYear}-${qDates.endMonth}`).endOf('month')
+  } else if (qDates.startYear && qDates.endYear) {
+    sDte = moment.utc(`${qDates.startYear}-01`)
+    eDte = moment.utc(`${qDates.endYear}-12`).endOf('year')
+  } else if (qDates.startYear && qDates.startMonth && qDates.endMonth) {
+    sDte = moment.utc(`${qDates.startYear}-${qDates.startMonth}`)
+    eDte = moment.utc(`${qDates.startYear}-${qDates.endMonth}`).endOf('month')
+  } else if (qDates.startYear && qDates.startMonth) {
+    sDte = moment.utc(`${qDates.startYear}-${qDates.startMonth}`)
+    eDte = sDte.clone().endOf('month')
+  } else {
+    sDte = moment.utc(`${qDates.startYear}-01`)
+    eDte = sDte.clone().endOf('year')
+  }
+
+  q.recordDate = { $gte: sDte.format(), $lte: eDte.format() }
+
+  const fields = {
+    attendant: 1,
+    stationID: 1,
+    overshort: 1,
+    recordDate: 1,
+    recordNum: 1,
+    salesSummary: 1,
+  }
+
+  const dataRet = {
+    id: 'attendant-report',
+    meta: {
+      startDate: sDte.format(),
+      endDate: eDte.format(),
+    },
+    keys: null,
+  }
+  // console.log(util.inspect(q, {showHidden: false, depth: null}))
+  try {
+    const sales = await Sales
+      .find(q, fields)
+      .limit(recordLimit)
+      .sort({ recordNum: 1 })
+      .populate('stationID')
+
+    dataRet.keys = sales
+    return h.response(dataRet)
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+}
+
+ReportHandler.prototype.productSales = async (request, h) => {
+  if (!request.query.date) {
+    return Boom.badRequest('Missing date')
+  }
+  if (!request.query.stationID) {
+    return Boom.badRequest('Missing stationID')
+  }
+
+  const sDte = moment.utc(request.query.date)
+  const eDte = sDte.clone().endOf('month')
+  const stationID = mongoose.Types.ObjectId(request.query.stationID)
+  const endDate = eDte.clone().startOf('day')
+
+  let data
+  let closeRecords
+  let openRecords
+  let flags = {}
+
+  try {
+    data = await NonFuelSales.aggregate([
+      { $match: { recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() }, stationID } },
+      {
+        $lookup: {
+          from: 'products', localField: 'productID', foreignField: '_id', as: 'product',
+        },
+      },
+      { $unwind: '$product' },
+      {
+        $group: {
+          _id: { id: '$product._id', category: '$product.category', name: '$product.name' },
+          restock: { $sum: '$qty.restock' },
+          sales: { $sum: '$sales' },
+          sold: { $sum: '$qty.sold' },
+        },
+      },
+      { $sort: { '_id.category': 1, '_id.name': 1 } },
+    ])
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+
+  // console.log(util.inspect(data, {showHidden: false, depth: null}))
+
+  // Now fetch opening and closing stock values
+  try {
+    openRecords = await NonFuelSales
+      .find({ recordDate: sDte.toDate(), stationID })
+      .sort({ productID: 1, recordNum: 1 })
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+  try {
+    closeRecords = await NonFuelSales
+      .find({ recordDate: { $gte: sDte.toDate(), $lte: endDate.toDate() }, stationID })
+      .sort({ productID: 1, recordNum: -1 })
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+
+  // filter unique products
+  flags = {}
+  const open = openRecords.filter((entry) => {
+    if (flags[entry.productID]) {
+      return false
+    }
+    flags[entry.productID] = true
+    return true
+  })
+
+  flags = {}
+  const close = closeRecords.filter((entry) => {
+    if (flags[entry.productID]) {
+      return false
+    }
+    flags[entry.productID] = true
+    return true
+  })
+
+  const records = await data.map((r) => {
+    const record = ramda.clone(r)
+    // Set opening stock
+    let openEle = open.find((o) => {
+      if (o.productID.toString() === record._id.id.toString()) {
+        return o
+      }
+      return false
+    })
+    // This next case is when a new product is added after the 1st of the month
+    // and we need an opening value
+    if (!openEle) {
+      openEle = { qty: { open: 0 } }
+    }
+    record.openStock = openEle.qty.open
+    // Set closing stock
+    const closeEle = close.find((o) => {
+      if (o.productID.toString() === record._id.id.toString()) {
+        return o
+      }
+      return null
+    })
+    record.closeStock = closeEle.qty.close
+    // Now balance should be zero
+    record.balance = record.openStock + record.restock - record.sold - record.closeStock
+    record.id = record._id.id.toString()
+    record.category = record._id.category
+    record.name = record._id.name
+    delete record._id
+    return r
+  })
+
+  return h.response({ records })
+}
+
+ReportHandler.prototype.productSalesAdjust = async (request, h) => {
+  if (!request.query.date) {
+    return Boom.badRequest('Missing date')
+  }
+  if (!request.query.stationID) {
+    return Boom.badRequest('Missing stationID')
+  }
+
+  const sDte = moment.utc(request.query.date)
+  const eDte = sDte.clone().add({ months: 1 })
+  const stationID = mongoose.Types.ObjectId(request.query.stationID)
+
+  const q = [
+    { $match: { type: 'nonFuelSaleAdjust', 'recordsAffected.recordNum': { $gte: sDte.format('YYYY-MM-DD').toString(), $lt: eDte.format('YYYY-MM-DD').toString() }, stationID } },
+    {
+      $lookup: {
+        from: 'products', localField: 'productRecord', foreignField: '_id', as: 'product',
+      },
+    },
+    { $unwind: '$product' },
+    {
+      $group: {
+        _id: { id: '$productID', name: '$product.name' },
+        qty: { $sum: 1 },
+        adjust: { $sum: { $abs: '$values.adjust' } },
+      },
+    },
+    { $sort: { '_id.name': 1 } },
+  ]
+  // console.log(util.inspect(q, {showHidden: false, depth: null}))
+
+  let records
+  try {
+    records = await Journal.aggregate(q)
+    return h.response({ records })
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+}
+
+ReportHandler.prototype.oilProductSales = async (request, h) => {
+  if (!request.query.date) {
+    return Boom.badRequest('Missing date')
+  }
+  if (!request.query.stationID) {
+    return Boom.badRequest('Missing stationID')
+  }
+
+  const sDte = moment.utc(request.query.date)
+  const eDte = sDte.clone().endOf('month')
+  const stationID = mongoose.Types.ObjectId(request.query.stationID)
+  const endDate = eDte.clone().startOf('day')
+
+  let data
+  let products
+  let closeRecords
+  let openRecords
+  let flags = {}
+
+  try {
+    products = await Product.find({ oilProduct: true }, { _id: 1 })
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+
+  const productIDs = products.map(p => p._id)
+
+  try {
+    data = await NonFuelSales.aggregate([
+      {
+        $match: {
+          recordDate: { $gte: sDte.toDate(), $lte: eDte.toDate() },
+          stationID,
+          productID: { $in: productIDs },
+        },
+      },
+      {
+        $lookup: {
+          from: 'products', localField: 'productID', foreignField: '_id', as: 'product',
+        },
+      },
+      { $unwind: '$product' },
+      {
+        $group: {
+          _id: { id: '$product._id', category: '$product.category', name: '$product.name' },
+          restock: { $sum: '$qty.restock' },
+          sales: { $sum: '$sales' },
+          sold: { $sum: '$qty.sold' },
+        },
+      },
+      { $sort: { '_id.category': 1, '_id.name': 1 } },
+    ])
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+
+  // Now fetch opening and closing stock values
+  try {
+    openRecords = await NonFuelSales
+      .find({ recordDate: sDte.toDate(), stationID })
+      .sort({ productID: 1, recordNum: 1 })
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+
+  try {
+    closeRecords = await NonFuelSales
+      .find({ recordDate: endDate.toDate(), stationID })
+      .sort({ productID: 1, recordNum: -1 })
+  } catch (err) {
+    return Boom.badRequest(err)
+  }
+
+  flags = {}
+  const open = openRecords.filter((entry) => {
+    if (flags[entry.productID]) {
+      return false
+    }
+    flags[entry.productID] = true
+    return true
+  })
+
+  flags = {}
+  const close = closeRecords.filter((entry) => {
+    if (flags[entry.productID]) {
+      return false
+    }
+    flags[entry.productID] = true
+    return true
+  })
+
+  const records = data.map((r) => {
+    const record = ramda.clone(r)
+    // Set opening stock
+    const openEle = open.find((o) => {
+      if (o.productID.toString() === record._id.id.toString()) {
+        return o
+      }
+      return null
+    })
+    record.openStock = openEle.qty.open
+    // Set closing stock
+    const closeEle = close.find((o) => {
+      if (o.productID.toString() === record._id.id.toString()) {
+        return o
+      }
+      return null
+    })
+    record.closeStock = closeEle.qty.close
+    // Now balance should be zero
+    record.balance = record.openStock + record.restock - record.sold - record.closeStock
+    record.id = record._id.id.toString()
+    record.category = record._id.category
+    record.name = record._id.name
+    delete record._id
+    return record
+  })
+
+
+  return h.response({ records })
+}
+
+module.exports = ReportHandler

@@ -1,0 +1,12 @@
+awsRegion: 'ca-central-1'
+mongoDBHost: 192.168.86.24
+mongoDBName: 'gales-sales'
+mongoDBPassword: null
+mongoDBUsername: null
+mongoDBPort: 27017
+mongoDBReplset: null
+serverPort: 3101 # 3100 is used for existing production
+serverHost: '0.0.0.0'
+ssmPath: 'gsales'
+nodeEnv: 'prod'
+usessm: true

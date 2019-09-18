@@ -1,0 +1,15 @@
+'use strict'
+
+const ExportPropaneHandler = require('../handler/export-propane')
+const handler = new ExportPropaneHandler()
+
+module.exports = {
+  method: 'POST',
+  path: '/export-propane',
+  handler: handler.export,
+  config: {
+    // auth: {
+    //   scope: ['accounts', 'admin', 'cash', 'su']
+    // }
+  }
+}

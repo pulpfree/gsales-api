@@ -1,0 +1,15 @@
+'use strict'
+
+const ExportFuelHandler = require('../handler/export-fuel')
+const handler = new ExportFuelHandler()
+
+module.exports = {
+  method:   'POST',
+  path:     '/export-fuel',
+  handler:  handler.export,
+  config: {
+    // auth: {
+    //   scope: ['accounts', 'admin', 'cash', 'su'],
+    // },
+  },
+}

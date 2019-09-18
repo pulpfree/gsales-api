@@ -1,0 +1,186 @@
+# cSpell:disable
+AWSTemplateFormatVersion : '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: Gales Sales API Lambda Server
+
+Parameters:
+  ParamProjectName:
+    Type: String
+    Description: Name of the API - used to generate unique names for resources
+    MinLength: 3
+    MaxLength: 20
+    AllowedPattern: '^[a-zA-Z][a-zA-Z0-9_-]*$'
+  ParamAccountId:
+    Type: String
+    Description: Account ID
+  ParamSSMPath:
+    Type: String
+    Description: Second path part in ssmParams
+    Default: gsales
+  ParamENV:
+    Type: String
+  ParamKMSKeyID:
+    Description: KMS key id
+    Type: String
+  ParamThundraKey:
+    Description: thundra.io API key
+    Type: String
+
+Resources:
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      # Cors: "'*'"
+      # see link for (apparently) undocumented Auth properties
+      # link: https://awsdevelopers.slack.com/archives/CA18Q1ZCM/p1560266323067200
+      # Auth:
+      #   DefaultAuthorizer: LambdaTokenAuthorizer
+      #   Authorizers:
+      #     LambdaTokenAuthorizer:
+      #       FunctionArn: !GetAtt AuthLambda.Arn
+      #       Identity:
+      #         ReauthorizeEvery: 300
+
+  Lambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: graphql.graphqlHandler
+      Runtime: nodejs10.x # doesn't work with sam local
+      # Runtime: nodejs8.10
+      CodeUri: build/
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 10
+      MemorySize: 512
+      Tracing: Active
+      Environment:
+        Variables:
+          NODE_ENV: prod
+          Stage: prod
+          thundra_apiKey: !Ref ParamThundraKey
+          # thundra_agent_lambda_report_cloudwatch_enable: true
+          # thundra_lambda_warmup_warmupAware: true
+      Events:
+        Http:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: "{proxy+}"
+            Method: ANY
+        # GraphqlRequest:
+        #   Type: Api
+        #   Properties:
+        #     RestApiId: !Ref Api
+        #     Path: /graphql
+        #     Method: POST
+        #     Auth:
+        #       Authorizer: LambdaTokenAuthorizer
+              # OAuthScopes doesn't appear to be integrated yet, see: https://github.com/awslabs/serverless-application-model/issues/652
+              # currently the only docs on this I've found are here: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-controlling-access-to-apis.html
+              # OAuthScopes:
+                # - all
+        # Options:
+        #   Type: Api
+        #   Properties:
+        #     RestApiId: !Ref Api
+        #     Path: /graphql
+        #     Method: OPTIONS
+        #     Auth:
+        #       Authorizer: NONE
+      VpcConfig:
+        # TODO: these should be extracted into params and .env file
+        SecurityGroupIds:
+          - sg-5afb2932
+          - sg-8f6baee7
+        SubnetIds:
+          - subnet-0da8d176
+          - subnet-7f092816
+      Tags:
+        BillTo: 'Gales'
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ParamProjectName}-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+      Policies:
+      - PolicyName: FunctionLogAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: '*'
+      - PolicyName: FunctionXRayAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+            Effect: Allow
+            Resource: '*'
+      # - PolicyName: FunctionS3Access
+      #   PolicyDocument:
+      #     Version: 2012-10-17
+      #     Statement:
+      #     - Action:
+      #       - s3:*
+      #       Effect: Allow
+      #       Resource: arn:aws:s3:::*
+      - PolicyName: FunctionParameterAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Action:
+            - ssm:GetParametersByPath
+            Effect: Allow
+            Resource: !Sub arn:aws:ssm:${AWS::Region}:${ParamAccountId}:parameter/${ParamENV}/${ParamSSMPath}*
+      - PolicyName: FunctionKMSAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - kms:Decrypt
+            - kms:DescribeKey
+            Resource: !Sub arn:aws:kms:${AWS::Region}:${ParamAccountId}:key/${ParamKMSKeyID}
+      - PolicyName: FunctionVPCAccess
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DeleteNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            Effect: Allow
+            Resource: '*'
+
+Outputs:
+  ApiId:
+    Description: "API ID"
+    Value: !Ref Api
+
+  ApiUrl:
+    Description: "API endpoint URL for Prod environment"
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod/'
+
+  LambdaARN:
+    Description: The Lambda Arn
+    Value: !GetAtt Lambda.Arn
+
+  # AuthLambdaARN:
+  #   Description: The Authorization Lambda Arn
+  #   Value: !GetAtt AuthLambda.Arn
