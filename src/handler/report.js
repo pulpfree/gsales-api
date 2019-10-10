@@ -1,7 +1,7 @@
 /* eslint-disable no-underscore-dangle, no-case-declarations */
 import ramda from 'ramda'
 
-const Boom = require('boom')
+import Boom from '@hapi/boom'
 const sanz = require('mongo-sanitize')
 const mongoose = require('mongoose')
 const moment = require('moment')

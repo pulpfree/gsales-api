@@ -6,6 +6,30 @@ import mongoose from './mongo/connect'
 
 let cfg
 let db
+
+const routes = async () => {
+  if (!cfg) {
+    cfg = await config.load()
+  }
+
+  const server = Hapi.server({
+    port: cfg.serverPort,
+    host: cfg.serverHost,
+    routes: { cors: true },
+  })
+
+  glob.sync('/route/*.js', {
+    root: __dirname,
+  }).forEach((file) => {
+    // eslint-disable-next-line import/no-dynamic-require, global-require
+    const route = require(file)
+    server.route(route)
+  })
+  return server
+}
+
+exports.initRoutes = routes
+
 exports.init = async () => {
   if (!cfg) {
     cfg = await config.load()
@@ -16,7 +40,7 @@ exports.init = async () => {
     host: cfg.serverHost,
   })
 
-  glob.sync('/route/*.js', {
+  glob.sync('./route/*.js', {
     root: __dirname,
   }).forEach((file) => {
     const route = require(file) // eslint-disable-line
@@ -33,26 +57,16 @@ exports.start = async () => {
     cfg = await config.load()
     db = await mongoose.connect(cfg)
   }
-
-  const server = Hapi.server({
-    port: cfg.serverPort,
-    host: cfg.serverHost,
-    routes: { cors: true },
-  })
-
-  glob.sync('/route/*.js', {
-    root: __dirname,
-  }).forEach((file) => {
-    const route = require(file) // eslint-disable-line
-    server.route(route)
-  })
+  const server = await routes()
 
   await server.start()
-  console.log('Server running on: %s in stage: %s', server.info.uri, cfg.nodeEnv) // eslint-disable-line no-console
+  // eslint-disable-next-line no-console
+  console.log('Server running on: %s in stage: %s', server.info.uri, cfg.nodeEnv)
   return server
 }
 
 process.on('unhandledRejection', (err) => {
-  console.log(err) // eslint-disable-line no-console
+  // eslint-disable-next-line no-console
+  console.log(err)
   process.exit(1)
 })

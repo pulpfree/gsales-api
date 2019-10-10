@@ -1,6 +1,6 @@
 /* eslint-disable no-underscore-dangle */
+import Boom from '@hapi/boom'
 
-const Boom = require('boom')
 const sanz = require('mongo-sanitize')
 const mongoose = require('mongoose')
 const FuelSales = require('../model/fuel-sales')

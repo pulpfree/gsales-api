@@ -1,6 +1,6 @@
 
 
-const Boom = require('boom')
+import Boom from '@hapi/boom'
 const flatten = require('flat')
 const { unflatten } = require('flat')
 const Fueldefinition = require('../model/fuel-definition')

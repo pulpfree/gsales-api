@@ -1,5 +1,3 @@
-
-
 const ContactHandler = require('../handler/contact')
 
 const handler = new ContactHandler()

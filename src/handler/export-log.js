@@ -1,6 +1,6 @@
 
 
-const Boom = require('boom')
+import Boom from '@hapi/boom'
 // const sanz = require('mongo-sanitize')
 
 const RecordExport = require('../model/export-log')

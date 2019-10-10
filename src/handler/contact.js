@@ -1,6 +1,5 @@
+import Boom from '@hapi/boom'
 
-
-const Boom = require('boom')
 const sanz = require('mongo-sanitize')
 const util = require('util')
 const Contact = require('../model/contact')

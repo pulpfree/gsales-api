@@ -1,8 +1,7 @@
 /* eslint-disable no-case-declarations, no-underscore-dangle */
-
 import ramda from 'ramda'
+import Boom from '@hapi/boom'
 
-const Boom = require('boom')
 const sanz = require('mongo-sanitize')
 const mongoose = require('mongoose')
 const Config = require('../model/config')
@@ -49,7 +48,7 @@ const formatDate = (date) => {
   return `${fdt.year}-${fdt.mon}-${fdt.day}`
 }
 
-const correctedDate = date => new Date(date.getTime() + (60000 * (date.getTimezoneOffset())))
+const correctedDate = (date) => new Date(date.getTime() + (60000 * (date.getTimezoneOffset())))
 
 
 function SalesHandler() {}

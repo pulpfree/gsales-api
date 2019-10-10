@@ -1,6 +1,6 @@
 
 
-const Boom = require('boom')
+import Boom from '@hapi/boom'
 const sanz = require('mongo-sanitize')
 // const mongoose = require('mongoose')
 const Dispenser = require('../model/dispenser')

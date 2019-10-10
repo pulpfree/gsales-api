@@ -33,7 +33,7 @@ node_modules
 /dump
 
 # misc
-dist
+build
 **/scratch*
 yarn.lock
 .env
