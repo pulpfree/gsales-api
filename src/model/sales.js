@@ -22,6 +22,7 @@ const salesSchema = new Schema(
       dieselDiscount: { type: Number, default: 0.00 },
       driveOffNSF: { type: Number, default: 0.00 },
       giftCertRedeem: { type: Number, default: 0.00 },
+      galesLoyaltyRedeem: { type: Number, default: 0.00 },
       lotteryPayout: { type: Number, default: 0.00 },
       osAdjusted: { type: Number, default: 0.00 },
       other: { type: Number, default: 0.00 },

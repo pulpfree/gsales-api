@@ -7,31 +7,16 @@ module.exports = [
     method: 'GET',
     path: '/sales',
     handler: handler.find,
-    // config: {
-    // auth: {
-    //   scope: ['accounts', 'admin', 'cash', 'su']
-    // }
-    // }
   },
   {
     method: 'GET',
     path: '/sales/{crit}',
     handler: handler.findByCriteria,
-    config: {
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
-    },
   },
   {
     method: 'GET',
     path: '/sale/{id}',
     handler: handler.findOne,
-    config: {
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
-    },
   },
   {
     method: 'POST',
@@ -40,9 +25,6 @@ module.exports = [
       payload: {
         output: 'data',
       },
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
     },
     handler: handler.createShift,
   },
@@ -53,11 +35,28 @@ module.exports = [
       payload: {
         output: 'data',
       },
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
     },
     handler: handler.update,
+  },
+  {
+    method: 'PUT',
+    path: '/sale-attendant/{id}',
+    config: {
+      payload: {
+        output: 'data',
+      },
+    },
+    handler: handler.updateAttendant,
+  },
+  {
+    method: 'PUT',
+    path: '/sale-otherfuel/{id}',
+    config: {
+      payload: {
+        output: 'data',
+      },
+    },
+    handler: handler.updateOtherFuel,
   },
   {
     method: 'PATCH',
@@ -66,24 +65,8 @@ module.exports = [
       payload: {
         output: 'data',
       },
-    //   auth: {
-    //     scope: ['accounts', 'admin', 'cash', 'su']
-    //   }
     },
     handler: handler.patch,
-  },
-  {
-    method: 'PATCH',
-    path: '/sale-non-fuel/{id}',
-    config: {
-      payload: {
-        output: 'data',
-      },
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
-    },
-    handler: handler.patchNonFuel,
   },
   {
     method: 'PATCH',
@@ -92,9 +75,6 @@ module.exports = [
       payload: {
         output: 'data',
       },
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
     },
     handler: handler.patchSummary,
   },
@@ -105,9 +85,6 @@ module.exports = [
       payload: {
         output: 'data',
       },
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
     },
     handler: handler.patchOtherFuel,
   },
@@ -115,20 +92,10 @@ module.exports = [
     method: 'DELETE',
     path: '/sale/{id}',
     handler: handler.remove,
-    config: {
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
-    },
   },
   {
     method: 'DELETE',
     path: '/sale-shift',
     handler: handler.removeShift,
-    config: {
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
-    },
   },
 ]

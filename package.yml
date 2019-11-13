@@ -44,7 +44,7 @@ Resources:
     Properties:
       Handler: index.handler
       Runtime: nodejs10.x
-      CodeUri: s3://gsales-api/lambda/e6b180f4295ea466821b9acc221bb8ac
+      CodeUri: s3://gsales-api/lambda/44ce0ccf414acc020c47f4f95cc6ccb4
       Role:
         Fn::GetAtt:
         - LambdaRole
@@ -100,7 +100,7 @@ Resources:
   AuthLambda:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: s3://gsales-api/lambda/e6b180f4295ea466821b9acc221bb8ac
+      CodeUri: s3://gsales-api/lambda/44ce0ccf414acc020c47f4f95cc6ccb4
       Handler: authorizer/index.handler
       Runtime: nodejs10.x
       Environment:

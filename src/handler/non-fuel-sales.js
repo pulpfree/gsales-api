@@ -33,7 +33,7 @@ const calculateTotals = async (docId) => {
     return Boom.badImplementation(error)
   }
   const { stationID, recordNum } = saleRec
-  const { fuelDollar, bobsFuelAdj } = saleRec.salesSummary
+  const { fuelDollar, bobsFuelAdj, otherFuelDollar } = saleRec.salesSummary
 
   // Fetch products total
   const ps = await NonFuelSales.aggregate([
@@ -48,10 +48,14 @@ const calculateTotals = async (docId) => {
     0
   )
 
+  const totalSales = parseFloat(
+    otherFuelDollar + otherNonFuelTotal + productSales + fuelDollar + bobsFuelAdj
+  )
   const fields = {
     'salesSummary.product': parseFloat(productSales),
     'salesSummary.totalNonFuel': parseFloat(otherNonFuelTotal + productSales),
-    'salesSummary.totalSales': parseFloat(otherNonFuelTotal + productSales + fuelDollar + bobsFuelAdj),
+    'salesSummary.totalSales': totalSales,
+    'overshort.amount': parseFloat(saleRec.salesSummary.cashCCTotal - totalSales),
   }
   try {
     await Sales.findByIdAndUpdate(docId, fields)
@@ -206,11 +210,7 @@ NonFuelSalesHandler.prototype.patch = async (request, h) => {
       + saleRecord.nonFuelAdjustOS
       + saleRecord.salesSummary.bobsFuelAdj
   }
-  /* const newSS = Object.assign(
-    {},
-    ramda.clone(saleRecord.salesSummary),
-    { product: productTotal, totalNonFuel, totalSales }
-  ) */
+
   const newSS = {
     ...saleRecord.salesSummary,
     product: productTotal,

@@ -18,12 +18,7 @@ module.exports = [
   {
     method: 'GET',
     path: '/employee-list',
-    handler: handler.activeList,
-    config: {
-      // auth: {
-      //   scope: ['accounts', 'admin', 'cash', 'su']
-      // }
-    },
+    handler: handler.list,
   },
   {
     method: 'GET',
