@@ -1,18 +1,20 @@
 include .env
 
-default: compileapp awsPackage awsDeploy
+default: compileapp awspackage awsdeploy
 
-deploy: buildapp awsPackage awsDeploy
+deploy: buildapp awspackage awsdeploy
 
 buildapp:
 	@rm -fr build/* && \
 	yarn run build && \
 	cp ./src/config/defaults.yml build/config/ && \
 	cp package.json build/ && \
-	# cp ./src/authorizer/jwks.json build/authorizer/ && \
+	cp ./src/authorizer/jwks.json build/authorizer/ && \
 	cd ./build && \
-	rm index.js && \
 	yarn install --prod
+
+
+# rm local.index.js && \
 	# find . -mtime +10950 -print -exec touch {} \;
 
 compileapp:
@@ -25,7 +27,7 @@ compileapp:
 run: compileapp
 	sam local start-api -n env.json
 
-awsPackage:
+awspackage:
 	@aws cloudformation package \
    --template-file ${FILE_TEMPLATE} \
    --output-template-file ${FILE_PACKAGE} \
@@ -34,7 +36,7 @@ awsPackage:
    --profile $(AWS_PROFILE) \
    --region $(AWS_REGION)
 
-awsDeploy:
+awsdeploy:
 	@aws cloudformation deploy \
    --template-file ${FILE_PACKAGE} \
    --region $(AWS_REGION) \
@@ -45,10 +47,12 @@ awsDeploy:
 	 --parameter-overrides \
 	 		ParamAccountId=$(AWS_ACCOUNT_ID) \
 	 	  ParamProjectName=$(AWS_STACK_NAME) \
+			ParamKMSKeyID=$(KMS_KEY_ID) \
 			ParamENV=$(ENV) \
-			# ParamAppBucket=$(APP_BUCKET_NAME) \
-			ParamKMSKeyID=$(KMS_KEY_ID)
-			# ParamThundraKey=$(THUNDRA_API_KEY)
+			ParamThundraKey=$(THUNDRA_API_KEY)
+			
+
+# ParamAppBucket=$(APP_BUCKET_NAME) \
 
 describe:
 	@aws cloudformation describe-stacks \

@@ -1,6 +1,6 @@
 
 
-const Boom = require('boom')
+import Boom from '@hapi/boom'
 const Bluebird = require('bluebird')
 const sanz = require('mongo-sanitize')
 const co = require('co')

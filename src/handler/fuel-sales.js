@@ -1,6 +1,6 @@
 /* eslint-disable no-underscore-dangle */
+import Boom from '@hapi/boom'
 
-const Boom = require('boom')
 const sanz = require('mongo-sanitize')
 const mongoose = require('mongoose')
 const FuelSales = require('../model/fuel-sales')
@@ -138,7 +138,7 @@ FuelSalesHandler.prototype.adjustOpening = async (request, h) => {
   let fuelCost = fData.prevSaleDoc.fuelCosts[`fuel_${fData.prevFuelDoc.gradeID}`]
   let netLitres = values.litres.adjust - fData.prevFuelDoc.litres.open
   let netDollars = values.dollars.adjust - fData.prevFuelDoc.dollars.open
-  let theory = netLitres * fuelCost / 100
+  let theory = (netLitres * fuelCost) / 100
   let diff = theory - netDollars
   const prevRec = {
     dollars: {
@@ -173,7 +173,7 @@ FuelSalesHandler.prototype.adjustOpening = async (request, h) => {
   fuelCost = fData.curSaleDoc.fuelCosts[`fuel_${fData.curFuelDoc.gradeID}`]
   netLitres = fData.curFuelDoc.litres.close - values.litres.adjust
   netDollars = fData.curFuelDoc.dollars.close - values.dollars.adjust
-  theory = netLitres * fuelCost / 100
+  theory = (netLitres * fuelCost) / 100
   diff = theory - netDollars
   const curRec = {
     dollars: {
@@ -219,8 +219,10 @@ FuelSalesHandler.prototype.adjustOpening = async (request, h) => {
     return Boom.badImplementation(err)
   }
 
-  const retVal = Object.assign({}, fData.curFuelDoc._doc, curRec)
-  return h.response(retVal).code(200)
+  // const retVal = Object.assign({}, fData.curFuelDoc._doc, curRec)
+  // const retVal = { ...fData.curFuelDoc._doc, ...curRec }
+  // return h.response(retVal).code(200)
+  return h.response({ docId: fData.curSaleDoc.id }).code(200)
 }
 
 FuelSalesHandler.prototype.resetDispenser = async (request, h) => {

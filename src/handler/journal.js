@@ -1,6 +1,6 @@
 /* eslint-disable no-case-declarations, no-underscore-dangle */
 
-const Boom = require('boom')
+import Boom from '@hapi/boom'
 const sanz = require('mongo-sanitize')
 // const mongoose = require('mongoose')
 // const util = require('util')

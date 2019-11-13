@@ -1,8 +1,7 @@
 /* eslint-disable no-case-declarations, no-underscore-dangle */
-
 import ramda from 'ramda'
+import Boom from '@hapi/boom'
 
-const Boom = require('boom')
 const sanz = require('mongo-sanitize')
 const mongoose = require('mongoose')
 const Config = require('../model/config')
@@ -49,7 +48,7 @@ const formatDate = (date) => {
   return `${fdt.year}-${fdt.mon}-${fdt.day}`
 }
 
-const correctedDate = date => new Date(date.getTime() + (60000 * (date.getTimezoneOffset())))
+const correctedDate = (date) => new Date(date.getTime() + (60000 * (date.getTimezoneOffset())))
 
 
 function SalesHandler() {}
@@ -381,76 +380,64 @@ SalesHandler.prototype.createShift = async (request, h) => {
   }
 }
 
+// This is now for cash and cards (items) only
 SalesHandler.prototype.update = async (request, h) => {
   const docId = sanz(request.params.id)
-  const method = sanz(request.payload.method)
-  let calcs = {}
+  const { items } = request.payload
+  const fieldKeys = Object.keys(items)
+  if (fieldKeys.length <= 0) {
+    return Boom.badData('Missing items')
+  }
 
-  switch (method) {
-    case 'updateNonFuelSales':
-      let bobsFuelAdj = 0.00
-      if (ramda.hasPath(['salesSummary', 'bobsFuelAdj'], request.payload.sales)) {
-        bobsFuelAdj = parseFloat(sanz(request.payload.sales.salesSummary.bobsFuelAdj))
-      }
-      const calculations = sanz(request.payload.sales.calculations)
-      const nonFuel = sanz(request.payload.sales.nonFuel)
-      const otherNonFuel = sanz(request.payload.sales.otherNonFuel)
-      const otherNonFuelBobs = sanz(request.payload.sales.otherNonFuelBobs)
+  // Fetch existing meta data
+  let saleRec
+  try {
+    saleRec = await Sales.findById(docId, { meta: 1, salesSummary: 1, _id: 0 }).exec()
+  } catch (error) {
+    return Boom.badImplementation(error)
+  }
 
-      // Fetch record so we can combine sales.
-      const sales = await Sales.findById(docId, { salesSummary: 1, stationID: 1 })
-      const fuelSales = sales.salesSummary.fuelDollar
+  const existCalcs = ramda.hasPath(['meta', 'calculations'], saleRec.toJSON()) ? saleRec.meta.calculations : {}
 
-      let totalNonFuelSales = 0.00
-      let productSales = 0.00
+  const fields = {}
+  const calcs = {}
+  let cardTotal = 0.00
+  let cashTotal = 0.00
+  let cashCCTotal = 0.00
 
-      await Promise.all(nonFuel.map(async (nf) => {
-        const fields = {
-          qty: nf.qty,
-          sales: nf.sales,
-        }
-        productSales += nf.sales
-        try {
-          await NonFuelSales.findByIdAndUpdate(nf.id, fields).exec()
-        } catch (error) {
-          return Boom.badImplementation(error)
-        }
-        return true
-      }))
+  fieldKeys.forEach((key) => {
+    fields[key] = items[key].value
+    if (key.indexOf('cash') > -1) {
+      cashTotal += fields[key]
+    }
+    if (key.indexOf('creditCard') > -1) {
+      cardTotal += fields[key]
+    }
+    if (items[key].calc) {
+      const calcKey = key.replace('.', ':')
+      calcs[calcKey] = items[key].calc
+    }
+  })
+  if (Object.keys(calcs).length) {
+    fields.meta = { calculations: { ...calcs, ...existCalcs } }
+  }
 
-      const otherNonFuelTotal = Object.values(otherNonFuel).reduce(
-        (accumulator, currentValue) => accumulator + currentValue,
-        0
-      )
+  cashCCTotal = parseFloat(cashTotal + cardTotal)
 
-      totalNonFuelSales = parseFloat(productSales + otherNonFuelTotal)
+  fields['salesSummary.cashTotal'] = parseFloat(cashTotal)
+  fields['salesSummary.creditCardTotal'] = parseFloat(cardTotal)
+  fields['salesSummary.cashCCTotal'] = cashCCTotal
+  fields['overshort.amount'] = cashCCTotal - saleRec.salesSummary.totalSales
 
-      // save data entry calculations
-      calcs = {}
-      if (calculations) { // Create key/value array so we can store in mongo
-        Object.keys(calculations).forEach((k) => {
-          const key = k.replace('.', ':')
-          calcs[key] = calculations[k]
-        })
-      }
+  try {
+    await Sales.findByIdAndUpdate(docId, fields)
+  } catch (err) {
+    return Boom.badData(err)
+  }
 
-      const fields = {
-        otherNonFuel,
-        otherNonFuelBobs,
-        'salesSummary.bobsFuelAdj': bobsFuelAdj,
-        'salesSummary.product': parseFloat(productSales),
-        'salesSummary.totalNonFuel': parseFloat(totalNonFuelSales),
-        'salesSummary.totalSales': parseFloat(totalNonFuelSales + fuelSales + bobsFuelAdj),
-        'meta.calculations': calcs,
-      }
-      try {
-        const doc = await Sales.findByIdAndUpdate(docId, fields, { new: true }).populate('attendant.ID')
-        return h.response(doc).code(200)
-      } catch (err) {
-        console.error(err) // eslint-disable-line no-console
-        return Boom.badRequest(err)
-      }
+  return h.response({ docId }).code(200)
 
+  /* switch (method) {
     case 'saveSummary':
 
       const { shift } = request.payload
@@ -527,7 +514,36 @@ SalesHandler.prototype.update = async (request, h) => {
 
     default:
       return Boom.badRequest('Invalid request')
+  } */
+}
+
+SalesHandler.prototype.updateAttendant = async (request, h) => {
+  const docId = sanz(request.params.id)
+  if (!docId) {
+    return Boom.badData('Missing docId')
   }
+
+  const {
+    adjustment,
+    overshortComplete,
+    overshortValue,
+    sheetComplete,
+  } = request.payload
+
+  const fields = {
+    'attendant.adjustment': sanz(adjustment),
+    'attendant.overshortComplete': sanz(overshortComplete),
+    'attendant.overshortValue': sanz(overshortValue),
+    'attendant.sheetComplete': sanz(sheetComplete),
+  }
+
+  try {
+    await Sales.findByIdAndUpdate(docId, fields)
+  } catch (err) {
+    throw new Error(err)
+  }
+
+  return h.response({ docId }).code(200)
 }
 
 SalesHandler.prototype.patch = async (request, h) => {
@@ -626,24 +642,6 @@ SalesHandler.prototype.patch = async (request, h) => {
         }
       }
 
-      return h.response(doc)
-
-    case 'closeShift':
-      try {
-        doc = await Sales.findByIdAndUpdate(id, { 'shift.flag': true }, { new: true }).populate('attendant.ID')
-        return h.response(doc).code(200)
-      } catch (error) {
-        console.error(error) // eslint-disable-line no-console
-        return Boom.badRequest(error)
-      }
-
-    default:
-      try {
-        doc = await Sales.findByIdAndUpdate(id, q, { select, new: true })
-      } catch (error) {
-        return Boom.badRequest(error)
-      }
-
       // Create Journal entry
       const jRec = {
         adjustDate: new Date(),
@@ -659,6 +657,24 @@ SalesHandler.prototype.patch = async (request, h) => {
       }
       try {
         await Journal.create(jRec)
+      } catch (error) {
+        return Boom.badRequest(error)
+      }
+
+      return h.response(doc)
+
+    case 'closeShift':
+      try {
+        await Sales.findByIdAndUpdate(id, { 'shift.flag': true })
+        return h.response({ docId: id }).code(200)
+      } catch (error) {
+        console.error(error) // eslint-disable-line no-console
+        return Boom.badRequest(error)
+      }
+
+    default:
+      try {
+        doc = await Sales.findByIdAndUpdate(id, q, { select, new: true })
         return h.response(doc)
       } catch (error) {
         return Boom.badRequest(error)
@@ -666,6 +682,7 @@ SalesHandler.prototype.patch = async (request, h) => {
   }
 }
 
+// FIXME: this too should be removed, existing is now in non-fuel-sales handler
 SalesHandler.prototype.patchNonFuel = async (request, h) => {
   /*
     Steps:
@@ -855,7 +872,7 @@ SalesHandler.prototype.patchSummary = async (request, h) => {
   const allowedFields = [
     'creditCard',
     'cash',
-    'otherFuel',
+    // 'otherFuel',
     'otherNonFuel',
     'otherNonFuelBobs',
     'salesSummary', // actually 'salesSummary.bobsFuelAdj'
@@ -896,8 +913,12 @@ SalesHandler.prototype.patchSummary = async (request, h) => {
     }
     journalAdjTp = 'salesSummaryAdjust'
 
+  // TODO: ensure this modification does not break existing functionality,
+  // and remove comments below
   // otherFuel or otherNonFuel field
-  } else if (fieldPrts[0] === allowedFields[2] || fieldPrts[0] === allowedFields[3]) {
+  // } else if (fieldPrts[0] === allowedFields[2] || fieldPrts[0] === allowedFields[3]) {
+  // otherNonFuel field
+  } else if (fieldPrts[0] === allowedFields[3]) {
     const otherNonFuelTotal = Object.values(shift.otherNonFuel).reduce((a, b) => a + b, 0)
     const totalNonFuel = shift.salesSummary.product + otherNonFuelTotal
     const totalSales = shift.salesSummary.fuelDollar
@@ -968,6 +989,51 @@ SalesHandler.prototype.patchSummary = async (request, h) => {
 }
 
 // I believe this only affects the Thorold Stone Back location, propane related
+SalesHandler.prototype.updateOtherFuel = async (request, h) => {
+  if (!request.params.id) {
+    return Boom.expectationFailed('Missing sales id value')
+  }
+
+  const values = sanz(request.payload.values)
+  const salesID = sanz(request.params.id)
+
+  // Start with the shift record so we can update totalSales
+  let shift
+  try {
+    shift = await Sales.findById(salesID)
+  } catch (err) {
+    return Boom.badImplementation(err)
+  }
+
+  // Prep update vals
+  const dollar = parseFloat(values.otherDollar)
+  const litre = parseFloat(values.otherLitre)
+  const totalSales = parseFloat(shift.salesSummary.fuelDollar
+    + dollar
+    + shift.salesSummary.totalNonFuel)
+  const updateVals = {
+    otherFuel: {
+      [values.fuel]: {
+        dollar,
+        litre,
+      },
+    },
+    'salesSummary.otherFuelLitre': litre,
+    'salesSummary.otherFuelDollar': dollar,
+    'salesSummary.totalSales': shift.salesSummary.fuelDollar + dollar + shift.salesSummary.totalNonFuel,
+    'overshort.amount': shift.salesSummary.cashCCTotal - totalSales + shift.nonFuelAdjustOS,
+  }
+
+  let res
+  try {
+    res = await shift.update(updateVals).exec()
+    return h.response(res)
+  } catch (err) {
+    return Boom.badImplementation(err)
+  }
+}
+
+// This only affects the Thorold Stone Back location, propane related
 SalesHandler.prototype.patchOtherFuel = async (request, h) => {
   if (!request.params.id) {
     return Boom.expectationFailed('Missing sales id value')

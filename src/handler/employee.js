@@ -1,6 +1,5 @@
+import Boom from '@hapi/boom'
 
-
-const Boom = require('boom')
 const sanz = require('mongo-sanitize')
 const Employee = require('../model/employee')
 
@@ -31,10 +30,13 @@ EmployeeHandler.prototype.find = async (request, h) => {
   }
 }
 
-EmployeeHandler.prototype.activeList = async (request, h) => {
+EmployeeHandler.prototype.list = async (request, h) => {
+  const activeParam = sanz(request.query.active)
+  const active = !(activeParam === 'false')
+
   try {
     const items = await Employee
-      .find({ active: true })
+      .find({ active })
       .select({ nameFirst: 1, nameLast: 1 })
       .sort({ nameLast: 1 })
       .exec()

@@ -1,5 +1,3 @@
-
-
 const JournalHandler = require('../handler/journal')
 
 const handler = new JournalHandler()
