@@ -107,7 +107,7 @@ ExportPropaneHandler.prototype.export = (req, reply) => {
     })
 
     // STEP 3 - Update import status to ensure no repeats
-    yield PIMP.update({ status: 'imported' }, { status: 'processed' }, { multi: true })
+    yield PIMP.updateMany({ status: 'imported' }, { status: 'processed' }, { multi: true })
 
 
     // STEP 4 - Either update or create record. For whatever, cannot seem to use 'save' for both

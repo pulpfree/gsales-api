@@ -1071,7 +1071,7 @@ SalesHandler.prototype.patchOtherFuel = async (request, h) => {
 
   let res
   try {
-    res = await shift.update(updateVals).exec()
+    res = await shift.updateOne(updateVals).exec()
   } catch (err) {
     return Boom.badImplementation(err)
   }
