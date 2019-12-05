@@ -12,6 +12,8 @@ import validator from './validator'
 
 const clientID = '2084ukslsc831pt202t2dudt7c'
 
+const thundra = require('@thundra/core')()
+
 // Since we're using hapijs (instead of graphql) our path changes for the various requests
 // and we need therefore to use a wildcard
 // see following links for more
@@ -51,7 +53,7 @@ function generateAuthResponse(principalId, effect, methodArn) {
   }
 }
 
-exports.handler = async (event) => {
+/* exports.handler = async (event) => {
   const token = event.authorizationToken
   const { methodArn } = event
   const validateResult = await validator(clientID, token)
@@ -69,4 +71,24 @@ exports.handler = async (event) => {
       console.error('Error:', validateResult.error) // eslint-disable-line no-console
       return Promise.reject(new Error('Invalid token')) // Returns 500 Internal Server Error
   }
-}
+} */
+
+exports.handler = thundra(async (event) => {
+  const token = event.authorizationToken
+  const { methodArn } = event
+  const validateResult = await validator(clientID, token)
+
+  switch (validateResult.status) {
+    case 'allow':
+      // return generateAuthResponse('user', 'Allow', methodArn) // for graphql only
+      return generateAuthResponse('user', 'Allow', methodPath)
+    case 'deny':
+      return generateAuthResponse('user', 'Deny', methodArn)
+    case 'unauthorized':
+      console.error('Error:', validateResult.error) // eslint-disable-line no-console
+      return Promise.reject(new Error('Unauthorized')) // Returns 401 unauthorized
+    default:
+      console.error('Error:', validateResult.error) // eslint-disable-line no-console
+      return Promise.reject(new Error('Invalid token')) // Returns 500 Internal Server Error
+  }
+})

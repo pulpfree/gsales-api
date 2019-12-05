@@ -17,6 +17,7 @@ db.connect = async function connect(cfg) {
   mongoose.set('useCreateIndex', true)
   mongoose.set('useNewUrlParser', true)
   mongoose.set('useFindAndModify', false)
+  mongoose.set('useUnifiedTopology', true)
 
   // see: https://medium.com/@vsvaibhav2016/best-practice-of-mongoose-connection-with-mongodb-c470608483f0
   // for info on best practices

@@ -38,4 +38,4 @@ build
 yarn.lock
 .env
 docs/ssm.md
-template.yml
+package.yml
