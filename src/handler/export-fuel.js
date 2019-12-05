@@ -133,7 +133,7 @@ ExportFuelHandler.prototype.export = (req, reply) => {
     }).catch(err => reply(Boom.badRequest(err)))
 
     // Update import status to ensure no repeats
-    yield DFSI.update({ status: 'imported' }, { status: 'processed' }, { multi: true })
+    yield DFSI.updateMany({ status: 'imported' }, { status: 'processed' }, { multi: true })
 
     let saveQty = 0
     let recordDtes = []

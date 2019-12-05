@@ -101,7 +101,7 @@ ContactHandler.prototype.updateUserAndContact = (req, reply) => {
     user.hashPassword()
     user.setBits()
 
-    User.update({ _id: id }, user, { runValidators: true }, (err) => {
+    User.updateOne({ _id: id }, user, { runValidators: true }, (err) => {
       if (err) return reply(Boom.badRequest(err))
     })
     Contact.findById(user.contact, (err, contact) => {
@@ -119,7 +119,7 @@ ContactHandler.prototype.updateUserAndContact = (req, reply) => {
           contact[key] = sanz(req.payload.contact[key])
         }
       })
-      Contact.update({ _id: user.contact }, contact, { runValidators: true }, (err) => {
+      Contact.updateOne({ _id: user.contact }, contact, { runValidators: true }, (err) => {
         if (err) return reply(Boom.badRequest(err))
         user.contact = contact
         reply(user).code(200)
@@ -177,7 +177,7 @@ ContactHandler.prototype.update = (req, reply) => {
       }
     })
 
-    Contact.update({ _id: id }, contact, { runValidators: true }, (err) => {
+    Contact.updateOne({ _id: id }, contact, { runValidators: true }, (err) => {
       if (err) return reply(Boom.badRequest(err))
       reply(contact).code(200)
     })
