@@ -44,7 +44,7 @@ Resources:
     Properties:
       Handler: index.handler
       Runtime: nodejs10.x
-      CodeUri: s3://gsales-api/lambda/10c6f39bcaf81958f8bdbc332de3c708
+      CodeUri: s3://gsales-api/lambda/582c1616b20f2ad2f793f60563a8551c
       Role:
         Fn::GetAtt:
         - LambdaRole
@@ -58,8 +58,9 @@ Resources:
           Stage: prod
           thundra_apiKey:
             Ref: ParamThundraKey
-          thundra_agent_lambda_report_cloudwatch_enable: true
+          thundra_agent_lambda_report_cloudwatch_enable: false
           thundra_lambda_warmup_warmupAware: true
+          thundra_agent_lambda_warmup_warmupAware: true
       Events:
         ProxyApiRoot:
           Type: Api
@@ -78,7 +79,7 @@ Resources:
             Path: '{proxy+}'
             Method: ANY
             Auth:
-              Authorizer: LambdaTokenAuthorizer
+              Authorizer: NONE
         Options:
           Type: Api
           Properties:
@@ -100,15 +101,16 @@ Resources:
   AuthLambda:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: s3://gsales-api/lambda/10c6f39bcaf81958f8bdbc332de3c708
+      CodeUri: s3://gsales-api/lambda/582c1616b20f2ad2f793f60563a8551c
       Handler: authorizer/index.handler
       Runtime: nodejs10.x
       Environment:
         Variables:
           thundra_apiKey:
             Ref: ParamThundraKey
-          thundra_agent_lambda_report_cloudwatch_enable: true
+          thundra_agent_lambda_report_cloudwatch_enable: false
           thundra_lambda_warmup_warmupAware: true
+          thundra_agent_lambda_warmup_warmupAware: true
   LambdaRole:
     Type: AWS::IAM::Role
     Properties:

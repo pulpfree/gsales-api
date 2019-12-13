@@ -14,7 +14,6 @@ const Sales = require('../model/sales')
 const Station = require('../model/station')
 const UtilHandler = require('./util')
 
-// const cofore = require('co-foreach')
 // const util = require('util')
 
 const fetchShiftRecord = async (shiftID) => {
@@ -280,7 +279,7 @@ SalesHandler.prototype.createShift = async (request, h) => {
 
   stationData.dispensers.forEach((d) => {
     const lastR = stationData.fuelSaleRecords.find(
-      r => r.dispenserID.toString() === d._id.toString()
+      (r) => r.dispenserID.toString() === d._id.toString()
     )
     grades.push(d.gradeID)
     // accommodate new dispensers
@@ -307,7 +306,7 @@ SalesHandler.prototype.createShift = async (request, h) => {
     prods.forEach((p) => {
       // check for an existing last record
       const lastR = stationData.nonFuelSaleRecords.find(
-        nf => nf.productID.toString() === p.productID.toString()
+        (nf) => nf.productID.toString() === p.productID.toString()
       )
 
       // If existing product, carry over the close qty
@@ -436,85 +435,6 @@ SalesHandler.prototype.update = async (request, h) => {
   }
 
   return h.response({ docId }).code(200)
-
-  /* switch (method) {
-    case 'saveSummary':
-
-      const { shift } = request.payload
-
-      let cardTotal = Object.values(shift.creditCard).reduce(
-        (accumulator, currentValue) => accumulator + currentValue,
-        0
-      )
-      let cashTotal = Object.values(shift.cash).reduce(
-        (accumulator, currentValue) => accumulator + currentValue,
-        0
-      )
-      cardTotal = parseFloat(cardTotal)
-      cashTotal = parseFloat(cashTotal)
-      const cashCCTotal = parseFloat(cashTotal + cardTotal)
-
-      // save data entry calculations
-      calcs = {}
-      if (shift.calculations) { // Create key/value array so we can store in mongo
-        Object.keys(shift.calculations).forEach((k) => {
-          const key = k.replace('.', ':')
-          calcs[key] = shift.calculations[k]
-        })
-      }
-
-      const submitVals = {}
-
-      // set defaults for totalSales calculation
-      if (!Object.prototype.hasOwnProperty.call(shift.salesSummary, 'totalNonFuel')) {
-        shift.salesSummary.totalNonFuel = 0
-      }
-      if (!Object.prototype.hasOwnProperty.call(shift.salesSummary, 'otherFuelDollar')) {
-        shift.salesSummary.otherFuelDollar = 0
-      }
-
-      const otherFuel = {
-        dollar: 0,
-        litre: 0,
-      }
-      if (shift.otherFuel) {
-        submitVals.otherFuel = shift.otherFuel
-        Object.keys(shift.otherFuel).forEach((k) => {
-          otherFuel.dollar += shift.otherFuel[k].dollar
-          otherFuel.litre += shift.otherFuel[k].litre
-        })
-        submitVals['salesSummary.otherFuelDollar'] = otherFuel.dollar
-        submitVals['salesSummary.otherFuelLitre'] = otherFuel.litre
-      }
-
-      let bobsFuelAdj2
-      if (shift.salesSummary.bobsFuelAdj !== 'undefined') {
-        bobsFuelAdj2 = shift.salesSummary.bobsFuelAdj
-      }
-
-      submitVals.creditCard = shift.creditCard
-      submitVals.cash = shift.cash
-      submitVals['attendant.sheetComplete'] = shift.attendant.sheetComplete
-      submitVals['attendant.overshortValue'] = shift.attendant.overshortValue
-      submitVals['attendant.overshortComplete'] = shift.attendant.overshortComplete
-      submitVals['meta.calculations'] = calcs
-      submitVals['overshort.descrip'] = shift.overshort.descrip
-      submitVals['overshort.amount'] = cashCCTotal - shift.salesSummary.totalSales
-      submitVals['salesSummary.cashTotal'] = cashTotal
-      submitVals['salesSummary.creditCardTotal'] = cardTotal
-      submitVals['salesSummary.cashCCTotal'] = cashCCTotal
-      submitVals['salesSummary.totalSales'] = (shift.salesSummary.fuelDollar + otherFuel.dollar + shift.salesSummary.totalNonFuel + bobsFuelAdj2)
-
-      try {
-        const doc = await Sales.findByIdAndUpdate(docId, submitVals, { new: true }).populate('attendant.ID')
-        return h.response(doc).code(200)
-      } catch (err) {
-        return Boom.badRequest(err)
-      }
-
-    default:
-      return Boom.badRequest('Invalid request')
-  } */
 }
 
 SalesHandler.prototype.updateAttendant = async (request, h) => {
@@ -619,7 +539,7 @@ SalesHandler.prototype.patch = async (request, h) => {
       fs.forEach((fr) => {
         if (fr.litres.net) {
           const fuelCost = doc.fuelCosts[`fuel_${fr.gradeID}`]
-          const theoretical = fr.litres.net * fuelCost / 100
+          const theoretical = (fr.litres.net * fuelCost) / 100
           const diff = theoretical - fr.dollars.net
           const rec = {
             dollars: {
@@ -755,7 +675,7 @@ SalesHandler.prototype.patchNonFuel = async (request, h) => {
   if (payVals.adjustAttend && payVals.adjustAttend.amount) {
     payVals.adjustAttend.productID = mongoose.Types.ObjectId(payVals.adjustAttend.productID)
     saleRecord.nonFuelAdjustVals.push(payVals.adjustAttend)
-    saleRecord.nonFuelAdjustOS = saleRecord.nonFuelAdjustVals.map(a => a.amount).reduce(
+    saleRecord.nonFuelAdjustOS = saleRecord.nonFuelAdjustVals.map((a) => a.amount).reduce(
       (accumulator, currentValue) => accumulator + currentValue,
       0
     )
@@ -763,7 +683,7 @@ SalesHandler.prototype.patchNonFuel = async (request, h) => {
 
   // Calculate new totals
   const otherNonFuelTotal = Object.keys(saleRecord.otherNonFuel)
-    .map(k => saleRecord.otherNonFuel[k] || 0)
+    .map((k) => saleRecord.otherNonFuel[k] || 0)
     .reduce((accumulator, currentValue) => accumulator + currentValue, 0)
 
   const totalNonFuel = otherNonFuelTotal + productTotal
@@ -776,7 +696,8 @@ SalesHandler.prototype.patchNonFuel = async (request, h) => {
       + saleRecord.nonFuelAdjustOS
       + saleRecord.salesSummary.bobsFuelAdj
   }
-  const newSS = Object.assign(
+  // FIXME: this should be object spread
+  const newSS = Object.assign( // eslint-disable-line prefer-object-spread
     {},
     ramda.clone(saleRecord.salesSummary),
     { product: productTotal, totalNonFuel, totalSales }
@@ -916,9 +837,7 @@ SalesHandler.prototype.patchSummary = async (request, h) => {
   // TODO: ensure this modification does not break existing functionality,
   // and remove comments below
   // otherFuel or otherNonFuel field
-  // } else if (fieldPrts[0] === allowedFields[2] || fieldPrts[0] === allowedFields[3]) {
-  // otherNonFuel field
-  } else if (fieldPrts[0] === allowedFields[3]) {
+  } else if (fieldPrts[0] === allowedFields[2]) { // otherNonFuel field
     const otherNonFuelTotal = Object.values(shift.otherNonFuel).reduce((a, b) => a + b, 0)
     const totalNonFuel = shift.salesSummary.product + otherNonFuelTotal
     const totalSales = shift.salesSummary.fuelDollar
@@ -932,16 +851,15 @@ SalesHandler.prototype.patchSummary = async (request, h) => {
     }
     journalAdjTp = 'nonFuelSaleAdjust'
 
-  // otherNonFuelBobs field
   // note: this field appears to be independent of any total
-  } else if (fieldPrts[0] === allowedFields[4]) {
+  } else if (fieldPrts[0] === allowedFields[3]) { // otherNonFuelBobs field
     updateVals = {
       otherNonFuelBobs: shift.otherNonFuelBobs,
     }
     journalAdjTp = 'nonFuelSaleAdjust'
 
   // Bob's Fuel Misc Adjustment (bobsFuelAdj)
-  } else if (fieldPrts[0] === allowedFields[5]) {
+  } else if (fieldPrts[0] === allowedFields[4]) { // salesSummary field
     const bobsFuelAdj = parseFloat(adjustment.adjustValue)
     const totalSales = parseFloat(
       saleRecord.salesSummary.totalNonFuel

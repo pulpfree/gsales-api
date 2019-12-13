@@ -21,6 +21,7 @@ let server
   return transformResponse(response)
 } */
 exports.handler = thundra(async (event) => {
+  // console.log('event', JSON.stringify(event))
   if (!server) {
     server = await api.start()
   }

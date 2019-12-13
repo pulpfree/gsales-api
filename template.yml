@@ -64,8 +64,9 @@ Resources:
           NODE_ENV: prod
           Stage: prod
           thundra_apiKey: !Ref ParamThundraKey
-          thundra_agent_lambda_report_cloudwatch_enable: true
+          thundra_agent_lambda_report_cloudwatch_enable: false
           thundra_lambda_warmup_warmupAware: true
+          thundra_agent_lambda_warmup_warmupAware: true
       Events:
         ProxyApiRoot:
           Type: Api
@@ -82,7 +83,8 @@ Resources:
             Path: "{proxy+}"
             Method: ANY
             Auth:
-              Authorizer: LambdaTokenAuthorizer
+              # Authorizer: LambdaTokenAuthorizer
+              Authorizer: NONE
               # OAuthScopes doesn't appear to be integrated yet, see: https://github.com/awslabs/serverless-application-model/issues/652
               # currently the only docs on this I've found are here: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-controlling-access-to-apis.html
               # OAuthScopes:
@@ -116,8 +118,9 @@ Resources:
       Environment:
         Variables:
           thundra_apiKey: !Ref ParamThundraKey
-          thundra_agent_lambda_report_cloudwatch_enable: true
+          thundra_agent_lambda_report_cloudwatch_enable: false
           thundra_lambda_warmup_warmupAware: true
+          thundra_agent_lambda_warmup_warmupAware: true
 
   LambdaRole:
     Type: AWS::IAM::Role
