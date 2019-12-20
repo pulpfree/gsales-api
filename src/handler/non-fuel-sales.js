@@ -62,6 +62,7 @@ const calculateTotals = async (docId) => {
   } catch (err) {
     throw new Error(err)
   }
+  return true
 }
 
 function NonFuelSalesHandler() { }
@@ -253,14 +254,17 @@ NonFuelSalesHandler.prototype.patch = async (request, h) => {
   const ps = []
   if (postSales.length) {
     postSales.forEach((postSale) => {
-      const postS = ramda.clone(postSale)
+      const postS = ramda.clone(postSale.toJSON())
       const restock = postS.qty.restock || 0
+      if (postS.qty.sold === undefined) {
+        postS.qty.sold = 0
+      }
       const close = (newClose - postS.qty.sold + restock)
       postS.qty.open = newClose
       postS.qty.close = close
 
       newClose = close // Set value for next days` open
-      const promise = NonFuelSales.update({ _id: postS._id }, { qty: postS.qty }).exec()
+      const promise = NonFuelSales.update({ _id: postS._id }, { qty: postS.qty })
       ps.push(promise)
     })
     if (ps.length > 0) {
