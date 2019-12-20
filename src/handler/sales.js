@@ -38,6 +38,46 @@ const stationIsBobs = async (stationID) => {
   }
 }
 
+const closeNonFuelProducts = async (shiftID) => {
+  /*
+    Steps:
+    1. fetch sale record for shift
+    2. fetch all non-fuel for station and recordNum
+    3. check for "sold" value, if non we update record with appropriate closing values
+  */
+  const saleRecord = await Sales.findById(shiftID)
+  const q = { stationID: saleRecord.stationID, recordNum: saleRecord.recordNum }
+  const nonFuelRecs = await NonFuelSales.find(q)
+
+  const ps = []
+  let rec
+  nonFuelRecs.forEach((nf) => {
+    if (nf.qty.sold === undefined) {
+      rec = {
+        qty: {
+          open: nf.qty.open,
+          close: nf.qty.open,
+          restock: 0,
+          sold: 0,
+        },
+        sales: 0,
+      }
+    }
+
+    const p = NonFuelSales.findByIdAndUpdate(nf._id, rec).exec()
+    ps.push(p)
+  })
+
+  if (ps.length > 0) {
+    try {
+      await Promise.all(ps)
+    } catch (error) {
+      return Boom.badRequest(error)
+    }
+  }
+  return true
+}
+
 const formatDate = (date) => {
   const fdt = {}
   const dt = new Date(date)
@@ -585,6 +625,9 @@ SalesHandler.prototype.patch = async (request, h) => {
 
     case 'closeShift':
       try {
+        // First we check if the non-fuel sales products weren't forgotten
+        await closeNonFuelProducts(id)
+        // Now close shift
         await Sales.findByIdAndUpdate(id, { 'shift.flag': true })
         return h.response({ docId: id }).code(200)
       } catch (error) {
