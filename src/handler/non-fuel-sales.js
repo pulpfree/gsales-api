@@ -145,16 +145,19 @@ NonFuelSalesHandler.prototype.patch = async (request, h) => {
   const saleRecord = ramda.clone(saleRec._doc)
   const isBobs = await stationIsBobs(saleRecord.stationID)
 
-  // We are only making adjustments to the close value for either restock or sales,
-  // the original restock value remains
+  // We are now making adjustment to the close value for either restock or sales
   const nonFuelUpdate = {
-    'qty.close': parseInt(payVals.close, 10),
+    'qty.close': Number(payVals.close),
   }
-  // Here the sold and sales values are adjusted when a 'Sold' or 'sales' type adjustment is made
+  // sold and sales values are adjusted when a 'Sold' or 'sales' type adjustment is made
   if (payVals.type === 'sales') {
     nonFuelUpdate['qty.sold'] = parseInt(payVals.sold, 10)
     nonFuelUpdate.sales = parseFloat(payVals.sales)
+  // restock change adjusted
+  } else if (payVals.type === 'stock') {
+    nonFuelUpdate['qty.restock'] = Number(payVals.stock)
   }
+
 
   let nonFuelDoc
   try {
@@ -264,7 +267,7 @@ NonFuelSalesHandler.prototype.patch = async (request, h) => {
       postS.qty.close = close
 
       newClose = close // Set value for next days` open
-      const promise = NonFuelSales.update({ _id: postS._id }, { qty: postS.qty })
+      const promise = NonFuelSales.updateOne({ _id: postS._id }, { qty: postS.qty })
       ps.push(promise)
     })
     if (ps.length > 0) {
