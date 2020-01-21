@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 //
-// To run this file, use: mongo pruneLocalTest.js at prompt
+// To run this file, use: mongo pruneLocal.js at prompt
 //
 const dbName = 'gales-sales'
 // const dbName = 'gales-sales-test'
