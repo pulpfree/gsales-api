@@ -1,8 +1,13 @@
-include .env
+# if the KEY environment variable is not set to either stage or prod, makefile will fail
+# KEY is confirmed below in the check_env directive
+include .env-$(ENV)
 
-default: compileapp awspackage awsdeploy
+default: check_env compileapp awspackage awsdeploy
 
-deploy: buildapp awspackage awsdeploy
+deploy: check_env buildapp awspackage awsdeploy
+
+check_env:
+	@echo -n "Your environment file is .env-$(ENV)? [y/N] " && read ans && [ $${ans:-N} = y ]
 
 buildapp:
 	@rm -fr build/* && \
@@ -13,17 +18,12 @@ buildapp:
 	cd ./build && \
 	yarn install --prod
 
-
-# rm local.index.js && \
+# leaving this here, as it was a requirement in a past build of another project
 	# find . -mtime +10950 -print -exec touch {} \;
 
 compileapp:
 	yarn run build
 
-# aws lambda invoke --function-name "HelloWorldFunction"
-# aws lambda invoke --function-name "AuthLambda" --endpoint-url "http://127.0.0.1:3001" --no-verify-ssl out.txt
-# sam local invoke [OPTIONS] [FUNCTION_IDENTIFIER]
-# sam local invoke AuthLambda
 run: compileapp
 	sam local start-api -n env.json
 
@@ -45,14 +45,14 @@ awsdeploy:
    --profile $(AWS_PROFILE) \
    --force-upload \
 	 --parameter-overrides \
-	 		ParamAccountId=$(AWS_ACCOUNT_ID) \
-	 	  ParamProjectName=$(AWS_STACK_NAME) \
-			ParamKMSKeyID=$(KMS_KEY_ID) \
+			ParamCertificateArn=$(CERTIFICATE_ARN) \
+			ParamCustomDomainName=$(CUSTOM_DOMAIN_NAME) \
 			ParamENV=$(ENV) \
-			ParamThundraKey=$(THUNDRA_API_KEY)
-			
-
-# ParamAppBucket=$(APP_BUCKET_NAME) \
+			ParamHostedZoneId=$(HOSTED_ZONE_ID) \
+			ParamKMSKeyID=$(KMS_KEY_ID) \
+			ParamThundraKey=$(THUNDRA_API_KEY) \
+	 		ParamAccountId=$(AWS_ACCOUNT_ID) \
+	 	  ParamProjectName=$(AWS_STACK_NAME)
 
 describe:
 	@aws cloudformation describe-stacks \
@@ -63,4 +63,4 @@ outputs:
 	@ make describe \
 		| jq -r '.Stacks[0].Outputs'
 
-.PHONY: buildapp compileapp configure default deploy buildapp run validate awspackage awsdeploy describe outputs
+.PHONY: buildapp compileapp configure default deploy buildapp run validate awspackage awsdeploy describe outputs check_env

@@ -5,6 +5,15 @@ Transform: AWS::Serverless-2016-10-31
 Description: Gales Sales API Lambda Server
 
 Parameters:
+  ParamCertificateArn:
+    Description: Domain Certificate Arn
+    Type: String
+  ParamCustomDomainName:
+    Description: Custom Domain Name
+    Type: String
+  ParamHostedZoneId:
+    Description: Hosted Zone ID
+    Type: String
   ParamProjectName:
     Type: String
     Description: Name of the API - used to generate unique names for resources
@@ -27,16 +36,13 @@ Parameters:
     Description: thundra.io API key
     Type: String
 
-# Globals:
-  # Api:
-    # EndpointConfiguration: REGIONAL
-    # Cors: "'*'"
-
 Resources:
   Api:
-    EndpointConfiguration: REGIONAL
     Type: AWS::Serverless::Api
+    DeletionPolicy: Delete
+    DependsOn: Lambda
     Properties:
+      EndpointConfiguration: REGIONAL
       StageName: Prod
       # see link for (apparently) undocumented Auth properties
       # link: https://awsdevelopers.slack.com/archives/CA18Q1ZCM/p1560266323067200
@@ -46,8 +52,32 @@ Resources:
           LambdaTokenAuthorizer:
             FunctionArn: !GetAtt AuthLambda.Arn
             Identity:
-              # ReauthorizeEvery: 0
+              # ReauthorizeEvery: 0 # for testing
               ReauthorizeEvery: 300
+
+      # Documentation for below: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#gateway-response-object
+      # Oddly, this property does not work with sam local
+      GatewayResponses:
+        UNAUTHORIZED:
+          StatusCode: 401
+          ResponseTemplates:
+            "application/json": '{ "message": $context.error.messageString }'
+          ResponseParameters:
+            Headers:
+              Access-Control-Expose-Headers: "'WWW-Authenticate'"
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+
+      # Docs for this at: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#domain-configuration-object
+      Domain:
+        DomainName: !Ref ParamCustomDomainName
+        CertificateArn: !Ref ParamCertificateArn
+        EndpointConfiguration: "REGIONAL"
+        Route53:
+          HostedZoneId: !Ref ParamHostedZoneId
+          EvaluateTargetHealth: true
+          DistributionDomainName:
+            Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
 
   Lambda:
     Type: AWS::Serverless::Function
@@ -61,8 +91,8 @@ Resources:
       Tracing: Active
       Environment:
         Variables:
-          NODE_ENV: prod
-          Stage: prod
+          NODE_ENV: !Ref ParamENV
+          Stage: !Ref ParamENV
           thundra_apiKey: !Ref ParamThundraKey
           thundra_agent_lambda_report_cloudwatch_enable: false
           thundra_lambda_warmup_warmupAware: true
@@ -155,14 +185,6 @@ Resources:
             - xray:PutTelemetryRecords
             Effect: Allow
             Resource: '*'
-      # - PolicyName: FunctionS3Access
-      #   PolicyDocument:
-      #     Version: 2012-10-17
-      #     Statement:
-      #     - Action:
-      #       - s3:*
-      #       Effect: Allow
-      #       Resource: arn:aws:s3:::*
       - PolicyName: FunctionParameterAccess
         PolicyDocument:
           Version: 2012-10-17
@@ -197,7 +219,7 @@ Outputs:
     Value: !Ref Api
 
   ApiUrl:
-    Description: "API endpoint URL for Prod environment"
+    Description: "API endpoint URL for environment"
     Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod/'
 
   LambdaARN:

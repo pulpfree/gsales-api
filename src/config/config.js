@@ -52,6 +52,7 @@ config.setDefaults = function setDefaults() {
 
   // set stage
   this.defaults.nodeEnv = process.env.Stage ? process.env.Stage : process.env.NODE_ENV
+  // console.log('this.defaults:', this.defaults)
 }
 
 config.getDefaults = function getDefaults() {
