@@ -1,66 +1,53 @@
 import jose from 'node-jose'
+import jwt from 'jsonwebtoken'
+
 import jwtSet from './jwks.json'
+
+// import { COGNITO_POOL_ID, COGNITO_REGION } from './constants'
+// const jwksUri = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_POOL_ID}/.well-known/jwks.json`
+
 
 const validator = async (clientID, token) => {
   if (!clientID) {
-    return {
-      status: null,
-      error: new Error('Missing clientID'),
-    }
+    throw new Error('Missing clientID')
   }
   if (!token) {
-    return {
-      status: null,
-      error: new Error('Missing token in validator'),
-    }
+    throw new Error('Missing token')
   }
 
-  const { keys } = jwtSet
-  const sections = token.split('.')
-  // get the kid from the headers prior to verification
-  let header = jose.util.base64url.decode(sections[0])
-  header = JSON.parse(header)
-  const { kid } = header
+  let keyStore = jose.JWK.createKeyStore(jwtSet)
 
-  let keyIdx = -1
-  for (let i = 0; i < keys.length; i += 1) {
-    if (kid === keys[i].kid) {
-      keyIdx = i
-      break
-    }
-  }
-  if (keyIdx === -1) {
-    return {
-      status: null,
-      error: new Error('Public key not found in jwks.json'),
-    }
+  const decoded = jwt.decode(token, { complete: true })
+  const { kid } = decoded.header
+
+  try {
+    keyStore = await jose.JWK.asKeyStore(jwtSet)
+  } catch (err) {
+    throw new Error(err)
   }
 
-  const keyRes = await jose.JWK.asKey(keys[keyIdx])
+  const key = keyStore.get(kid, { kty: 'RSA' })
 
   // verify the signature
-  const verifyRes = await jose.JWS.createVerify(keyRes).verify(token)
+  const verifyRes = await jose.JWS.createVerify(key).verify(token)
 
   // extract claims
   const claims = JSON.parse(verifyRes.payload)
+  // console.log('claims:', claims)
+  if (claims.client_id !== clientID) {
+    throw new Error('Token was not issued for this audience')
+  }
 
   // ensure token is not expired
   const currentTs = Math.floor(new Date() / 1000)
   if (currentTs > claims.exp) {
-    return {
-      status: 'unauthorized',
-      error: new Error('Token is expired'),
-    }
+    throw new Error('Token is expired')
   }
 
-  // check that clientID matches
-  if (claims.client_id !== clientID) {
-    return {
-      status: 'deny',
-      error: new Error('Token was not issued for this audience'),
-    }
-  }
-  return { status: 'allow', error: null }
+  // principalID = fmt.Sprintf("%s|%s", claims["username"], claims["client_id"])
+  const principalID = `${claims.username}|${claims.client_id}`
+
+  return principalID
 }
 
 export default validator

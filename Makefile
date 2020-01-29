@@ -1,5 +1,8 @@
 # if the KEY environment variable is not set to either stage or prod, makefile will fail
 # KEY is confirmed below in the check_env directive
+# example:
+# for stage run: ENV=stage make
+# for production run: ENV=prod make
 include .env-$(ENV)
 
 default: check_env compileapp awspackage awsdeploy

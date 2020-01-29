@@ -1,5 +1,5 @@
 awsRegion: 'ca-central-1'
-# mongoDBHost: 192.168.86.24
+# mongoDBHost: 192.168.86.137
 mongoDBHost: 127.0.0.1
 mongoDBName: 'gales-sales'
 mongoDBPassword: null
