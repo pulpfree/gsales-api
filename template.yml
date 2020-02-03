@@ -93,10 +93,10 @@ Resources:
         Variables:
           NODE_ENV: !Ref ParamENV
           Stage: !Ref ParamENV
-          # thundra_apiKey: !Ref ParamThundraKey
-          # thundra_agent_lambda_report_cloudwatch_enable: false
-          # thundra_lambda_warmup_warmupAware: true
-          # thundra_agent_lambda_warmup_warmupAware: true
+          thundra_apiKey: !Ref ParamThundraKey
+          thundra_agent_lambda_report_cloudwatch_enable: false
+          thundra_lambda_warmup_warmupAware: true
+          thundra_agent_lambda_warmup_warmupAware: true
       Events:
         ProxyApiRoot:
           Type: Api
@@ -145,12 +145,12 @@ Resources:
       CodeUri: build/
       Handler: authorizer/index.handler
       Runtime: nodejs10.x
-      # Environment:
-      #   Variables:
-      #     thundra_apiKey: !Ref ParamThundraKey
-      #     thundra_agent_lambda_report_cloudwatch_enable: false
-      #     thundra_lambda_warmup_warmupAware: true
-      #     thundra_agent_lambda_warmup_warmupAware: true
+      Environment:
+        Variables:
+          thundra_apiKey: !Ref ParamThundraKey
+          thundra_agent_lambda_report_cloudwatch_enable: false
+          thundra_lambda_warmup_warmupAware: true
+          thundra_agent_lambda_warmup_warmupAware: true
 
   LambdaRole:
     Type: AWS::IAM::Role
