@@ -1,5 +1,3 @@
-
-
 const mongoose = require('mongoose')
 
 const { Schema } = mongoose
@@ -19,13 +17,21 @@ const journalSchema = new Schema(
       type: String,
       trim: true,
       validate: {
-        validator: value => /^(fuelSaleAdjust|dispenserReset|nonFuelSaleAdjust|salesSummaryAdjust)$/i.test(value),
+        validator: (value) => /^(fuelSaleAdjust|dispenserReset|nonFuelSaleAdjust|salesSummaryAdjust)$/i.test(value),
       },
     },
     productID: Schema.Types.ObjectId,
     productRecord: {
       type: Schema.Types.ObjectId,
       ref: 'Product',
+    },
+    quantities: {
+      original: {
+        type: Object,
+      },
+      adjusted: {
+        type: Object,
+      },
     },
     recordNum: { type: String, required: true },
     stationID: {

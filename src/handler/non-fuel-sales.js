@@ -135,6 +135,7 @@ NonFuelSalesHandler.prototype.patch = async (request, h) => {
   const description = sanz(request.payload.description)
   const productID = sanz(request.payload.productID)
 
+  // Fetch original sales record
   let saleRec
   try {
     saleRec = await Sales.findById(salesID).exec()
@@ -144,6 +145,14 @@ NonFuelSalesHandler.prototype.patch = async (request, h) => {
 
   const saleRecord = ramda.clone(saleRec._doc)
   const isBobs = await stationIsBobs(saleRecord.stationID)
+
+  // Fetch original non-fuel-sales record
+  let origNonFuelRec
+  try {
+    origNonFuelRec = await NonFuelSales.findById(nonFuelSaleID).exec()
+  } catch (error) {
+    return Boom.badImplementation(error)
+  }
 
   // We are now making adjustment to the close value for either restock or sales
   const nonFuelUpdate = {
@@ -287,6 +296,10 @@ NonFuelSalesHandler.prototype.patch = async (request, h) => {
     description,
     productID,
     productRecord: productID,
+    quantities: {
+      original: origNonFuelRec.qty,
+      adjusted: nonFuelDoc.qty,
+    },
     recordsAffected: {
       nonFuelID: mongoose.Types.ObjectId(nonFuelDoc.id),
       salesID: mongoose.Types.ObjectId(salesID),
