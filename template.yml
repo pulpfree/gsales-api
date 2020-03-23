@@ -28,6 +28,7 @@ Parameters:
     Description: Second path part in ssmParams
     Default: gsales
   ParamENV:
+    Description: Stage environment
     Type: String
   ParamKMSKeyID:
     Description: KMS key id
@@ -46,6 +47,7 @@ Resources:
       StageName: Prod
       # see link for (apparently) undocumented Auth properties
       # link: https://awsdevelopers.slack.com/archives/CA18Q1ZCM/p1560266323067200
+      # Oddly, this property does not work with sam local
       Auth:
         DefaultAuthorizer: LambdaTokenAuthorizer
         Authorizers:
@@ -56,7 +58,6 @@ Resources:
               ReauthorizeEvery: 300
 
       # Documentation for below: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#gateway-response-object
-      # Oddly, this property does not work with sam local
       GatewayResponses:
         UNAUTHORIZED:
           StatusCode: 401
