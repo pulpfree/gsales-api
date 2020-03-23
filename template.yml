@@ -128,7 +128,6 @@ Resources:
               # currently the only docs on this I've found are here: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-controlling-access-to-apis.html
               # OAuthScopes:
                 # - all
-
       VpcConfig:
         # TODO: these should be extracted into params and .env file
         SecurityGroupIds:
@@ -146,6 +145,8 @@ Resources:
       CodeUri: build/
       Handler: authorizer/index.handler
       Runtime: nodejs10.x
+      Timeout: 10
+      MemorySize: 256
       Environment:
         Variables:
           thundra_apiKey: !Ref ParamThundraKey
