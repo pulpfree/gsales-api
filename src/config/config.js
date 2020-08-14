@@ -52,7 +52,6 @@ config.setDefaults = function setDefaults() {
 
   // set stage
   this.defaults.nodeEnv = process.env.Stage ? process.env.Stage : process.env.NODE_ENV
-  // console.log('this.defaults:', this.defaults)
 }
 
 config.getDefaults = function getDefaults() {
@@ -106,7 +105,7 @@ config.loadSSM = async function loadSSM() {
     ssmVals[p.Name.split('/')[3]] = p.Value
   })
 
-  this.config = Object.assign({}, this.defaults, ssmVals)
+  this.config = {...this.defaults, ...ssmVals}
 
   return true
 }

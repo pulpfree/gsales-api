@@ -16,9 +16,11 @@ test('set and get defaults', () => {
 })
 
 test('loads SSM params', async () => {
-  process.env.Stage = 'test'
+  process.env.Stage = 'prod'
+  const c = await cfg.load()
   const ssm = await cfg.loadSSM()
   expect(ssm).toBe(true)
+  expect(c.mongoDBPassword).toBeTruthy()
 })
 
 test('load final params', async () => {
