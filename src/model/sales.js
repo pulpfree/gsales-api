@@ -69,7 +69,8 @@ const salesSchema = new Schema(
     recordNum: { type: String, required: true },
     recordDate: { type: Date, required: true },
     salesSummary: {
-      bobsFuelAdj: { type: Number, default: 0.0 },
+      // bobsFuelAdj: { type: Number, default: 0.0 }, //TODO: remove after renaming to fuelAdjust
+      fuelAdjust: { type: Number, default: 0.0 },
       cashTotal: { type: Number, default: 0.0 },
       creditCardTotal: { type: Number, default: 0.0 },
       cashCCTotal: { type: Number, default: 0.0 },
