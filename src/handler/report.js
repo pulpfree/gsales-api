@@ -396,6 +396,7 @@ ReportHandler.prototype.monthlyStation = async (request, h) => {
           'cash-debit': { $sum: '$cash.debit' },
           'cash-dieselDiscount': { $sum: '$cash.dieselDiscount' },
           'cash-giftCertRedeem': { $sum: '$cash.giftCertRedeem' },
+          'cash-galesLoyaltyRedeem': { $sum: '$cash.galesLoyaltyRedeem' },
           'cash-driveOffNSF': { $sum: '$cash.driveOffNSF' },
           'cash-other': { $sum: '$cash.other' },
           'cash-payout': { $sum: '$cash.payout' },

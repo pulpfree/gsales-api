@@ -16,11 +16,6 @@ import { COGNITO_CLIENT_ID as clientID } from './constants'
 
 const thundra = require('@thundra/core')()
 
-// const clientID = '2ta5nd1q6sp2ahi5nnfq2ujuk'
-
-// console.log('Loading function') // eslint-disable-line no-console
-
-
 exports.handler = thundra(async (event) => {
   const token = event.authorizationToken
 
@@ -30,10 +25,6 @@ exports.handler = thundra(async (event) => {
   } catch (err) {
     return Promise.reject(new Error('Unauthorized'))
   }
-  // const validateResult = await validator(clientID, token)
-  console.log('principalId:', principalId)
-
-  // const principalId = 'user|a1b2c3d4'
 
   // build apiOptions for the AuthPolicy
   const apiOptions = {}
@@ -65,10 +56,7 @@ exports.handler = thundra(async (event) => {
 })
 
 exports.handler2 = function handler(event, context, callback) {
-  // console.log('event:', event)
-  // console.log(`Client token: ${event.authorizationToken}`) // eslint-disable-line no-console
-  // console.log(`Method ARN: ${event.methodArn}`) // eslint-disable-line no-console
-  const token = event.authorizationToken
+  // const token = event.authorizationToken
 
   // validate the incoming token
   // and produce the principal user identifier associated with the token
@@ -135,8 +123,8 @@ exports.handler2 = function handler(event, context, callback) {
     number: 1,
     bool: true,
   } */
-  console.log('authResponse:', authResponse)
-  console.log('authResponse:', authResponse.policyDocument.Statement)
+  // console.log('authResponse:', authResponse)
+  // console.log('authResponse:', authResponse.policyDocument.Statement)
   // authResponse.context.arr = ['foo']; <- this is invalid, APIGW will not accept it
   // authResponse.context.obj = {'foo':'bar'}; <- also invalid
 
