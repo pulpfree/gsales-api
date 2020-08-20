@@ -737,7 +737,7 @@ SalesHandler.prototype.patchNonFuel = async (request, h) => {
   if (isBobs) {
     totalSales = totalSales
       + saleRecord.nonFuelAdjustOS
-      + saleRecord.salesSummary.bobsFuelAdj
+      + saleRecord.salesSummary.fuelAdjust
   }
   // FIXME: this should be object spread
   const newSS = Object.assign( // eslint-disable-line prefer-object-spread
@@ -839,7 +839,7 @@ SalesHandler.prototype.patchSummary = async (request, h) => {
     // 'otherFuel',
     'otherNonFuel',
     'otherNonFuelBobs',
-    'salesSummary', // actually 'salesSummary.bobsFuelAdj'
+    'salesSummary', // actually 'salesSummary.fuelAdjust'
   ]
 
   const adjustment = sanz(request.payload.adjustment)
@@ -901,17 +901,17 @@ SalesHandler.prototype.patchSummary = async (request, h) => {
     }
     journalAdjTp = 'nonFuelSaleAdjust'
 
-  // Bob's Fuel Misc Adjustment (bobsFuelAdj)
+  // fuelAdjust
   } else if (fieldPrts[0] === allowedFields[4]) { // salesSummary field
-    const bobsFuelAdj = parseFloat(adjustment.adjustValue)
+    const fuelAdjust = parseFloat(adjustment.adjustValue)
     const totalSales = parseFloat(
       saleRecord.salesSummary.totalNonFuel
       + saleRecord.salesSummary.fuelDollar
       + saleRecord.nonFuelAdjustOS
-      + bobsFuelAdj
+      + fuelAdjust
     )
     updateVals = {
-      'salesSummary.bobsFuelAdj': bobsFuelAdj,
+      'salesSummary.fuelAdjust': fuelAdjust,
       'salesSummary.totalSales': totalSales,
       'overshort.amount': saleRecord.salesSummary.cashCCTotal - totalSales,
     }

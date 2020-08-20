@@ -33,7 +33,7 @@ const calculateTotals = async (docId) => {
     return Boom.badImplementation(error)
   }
   const { stationID, recordNum } = saleRec
-  const { fuelDollar, bobsFuelAdj, otherFuelDollar } = saleRec.salesSummary
+  const { fuelDollar, fuelAdjust, otherFuelDollar } = saleRec.salesSummary
 
   // Fetch products total
   const ps = await NonFuelSales.aggregate([
@@ -49,7 +49,7 @@ const calculateTotals = async (docId) => {
   )
 
   const totalSales = parseFloat(
-    otherFuelDollar + otherNonFuelTotal + productSales + fuelDollar + bobsFuelAdj
+    otherFuelDollar + otherNonFuelTotal + productSales + fuelDollar + fuelAdjust
   )
   const fields = {
     'salesSummary.product': parseFloat(productSales),
@@ -218,10 +218,10 @@ NonFuelSalesHandler.prototype.patch = async (request, h) => {
   let totalSales = totalNonFuel
     + saleRecord.salesSummary.fuelDollar
     + saleRecord.salesSummary.otherFuelDollar
+    + saleRecord.salesSummary.fuelAdjust
   if (isBobs) {
     totalSales = totalSales
       + saleRecord.nonFuelAdjustOS
-      + saleRecord.salesSummary.bobsFuelAdj
   }
 
   const newSS = {

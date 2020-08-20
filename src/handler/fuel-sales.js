@@ -37,7 +37,7 @@ const calculateFuelSummary = async (recordNum, stationID) => {
   const totalSales = parseFloat(totalFuelDollarSales
     + nonFuelSales
     + otherFuelDollar
-    + sales.salesSummary.bobsFuelAdj)
+    + sales.salesSummary.fuelAdjust)
   const update = {
     'salesSummary.fuelDollar': totalFuelDollarSales,
     'salesSummary.fuelLitre': parseFloat(totalFuelSales.litres),
