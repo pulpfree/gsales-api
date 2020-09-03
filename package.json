@@ -28,7 +28,7 @@
   "dependencies": {
     "@babel/runtime": "7.6.0",
     "@hapi/boom": "7.4.3",
-    "@hapi/hapi": "18.4.0",
+    "@hapi/hapi": "20.0.0",
     "@thundra/core": "2.7.0",
     "aws-sdk": "2.496.0",
     "co": "4.6.0",
