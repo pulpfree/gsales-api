@@ -14,5 +14,5 @@
 | Directory | CloudFormation Stack name | Require Upgrade | Description |
 | :------ | :--- | :--- | :--------- |
 | gsales-fs-export | gsales-fs-export | N | Lambda Service to extract fuel and propane sales from gales-sales app - updated version from gales-fuelsale-export - used by the Dips app, not from the Sales app |
-| gsales-pdf-reports | gsales-pdf-reports | Y |  |
-| gsales-xls-reports | gsales-xls-reports | Y |  |
+| gsales-pdf-reports | gsales-pdf-reports | N |  |
+| gsales-xls-reports | gsales-xls-reports | N |  |
