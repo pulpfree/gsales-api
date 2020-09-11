@@ -87,7 +87,7 @@ Resources:
       Runtime: nodejs10.x # doesn't work with sam local
       CodeUri: build/
       Role: !GetAtt LambdaRole.Arn
-      Timeout: 10
+      Timeout: 15
       MemorySize: 512
       Tracing: Active
       Environment:
